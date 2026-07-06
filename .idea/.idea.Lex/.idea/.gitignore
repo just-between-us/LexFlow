@@ -13,3 +13,16 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
+# Build results
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+# Rider
+.idea/
+*.DotSettings.user
+# Visual Studio
+.vs/
+*.tmp
+*.cache
