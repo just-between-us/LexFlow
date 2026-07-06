@@ -1,0 +1,448 @@
+﻿@page "/templates"
+@using Lex.Domain.DTOs
+@using Lex.Domain.Enums
+@using Lex.Domain.Interfaces
+@inject ITemplateCatalogService CatalogService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Каталог шаблонов</PageTitle>
+<div class="templates-page">
+    <div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
+        <div>
+            <MudText Typo="Typo.h4">Каталог шаблонов документов</MudText>
+            <MudText Typo="Typo.body2" Class="text-muted">
+                Готовые шаблоны для быстрого создания документов
+            </MudText>
+        </div>
+    </div>
+
+    <MudPaper Class="pa-4 mb-3 rounded-lg toolbar-panel" Elevation="0">
+        <MudStack Row="true" Spacing="2" Class="align-center flex-wrap">
+            <MudTextField @bind-Value="_searchTerm"
+                          Label="Поиск"
+                          Placeholder="Название или описание..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          DebounceInterval="350"
+                          OnDebounceIntervalElapsed="OnSearchDebounced"
+                          OnKeyUp="OnSearchKeyUp"
+                          Clearable="true"
+                          OnClearButtonClick="@(() => OnSearchCleared())"
+                          Variant="Variant.Outlined"
+                          Class="flex-grow-1"
+                          Style="min-width: 220px;"/>
+
+            <MudSelect T="DocumentType?"
+                       Label="Тип"
+                       Value="_selectedType"
+                       Variant="Variant.Outlined"
+                       Class="flex-shrink-0"
+                       Style="min-width: 160px;"
+                       ValueChanged="OnFilterChanged">
+                <MudSelectItem Value="@((DocumentType?)null)">Все типы</MudSelectItem>
+                @foreach (var type in Enum.GetValues<DocumentType>())
+                {
+                    <MudSelectItem Value="@((DocumentType?)type)">
+                        @GetTypeDisplayName(type)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudDivider Vertical="true" Class="mx-1 d-none d-md-flex" />
+
+            <MudTooltip Text="Порядок отображения">
+                <MudMenu Label="@GetSortLabel()"
+                         Icon="@Icons.Material.Filled.Sort"
+                         EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                         Variant="Variant.Text"
+                         Class="flex-shrink-0 rounded-button-hover-scale">
+                    @foreach (var (field, label) in SortOptions)
+                    {
+                        <MudMenuItem OnClick="@(() => SetSort(field))">
+                            <span class="d-flex align-center">
+                                @label
+                                @if (IsCurrentSort(field))
+                                {
+                                    <MudIcon Icon="@GetDirectionIcon()" Size="Size.Small" Class="ml-2" />
+                                }
+                            </span>
+                        </MudMenuItem>
+                    }
+                </MudMenu>
+            </MudTooltip>
+
+            <MudTooltip Text="@(_sortAscending ? "По возрастанию" : "По убыванию")">
+                <div Class="rounded-button-hover-scale">
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward"
+                                   OnClick="@ToggleSortDirection"
+                                   Style="@ArrowRotationStyle"
+                                   Variant="Variant.Text"/>
+                </div>
+            </MudTooltip>
+
+            <MudTooltip Text="Обновить">
+                <div Class="rounded-button-hover-scale">
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                                   OnClick="@OnRefreshClick"
+                                   Disabled="@_isRefreshing"
+                                   Style="@RefreshSpinStyle"
+                                   Variant="Variant.Text"/>
+                </div>
+            </MudTooltip>
+
+            <MudSpacer />
+
+            <MudChip T="string" Size="Size.Medium" Color="Color.Primary" Variant="Variant.Text">
+                @(_totalItems == 0 ? "Ничего не найдено" : $"Найдено: {_totalItems}")
+            </MudChip>
+        </MudStack>
+
+        @if (HasActiveFilters)
+        {
+            <MudStack Row="true" Spacing="1" Class="mt-3 flex-wrap align-center">
+                <MudText Typo="Typo.caption" Class="text-muted mr-1">Фильтры:</MudText>
+                @if (!string.IsNullOrWhiteSpace(_searchTerm))
+                {
+                    <MudChip T="string" Size="Size.Small" OnClose="@(() => OnSearchCleared())">
+                        "@_searchTerm"
+                    </MudChip>
+                }
+                @if (_selectedType.HasValue)
+                {
+                    <MudChip T="string" Size="Size.Small" OnClose="@(() => ClearTypeFilter())">
+                        @GetTypeDisplayName(_selectedType.Value)
+                    </MudChip>
+                }
+                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@ResetFilters">
+                    Сбросить всё
+                </MudButton>
+            </MudStack>
+        }
+    </MudPaper>
+
+    @if (_isLoading)
+    {
+        <MudGrid>
+            @for (int i = 0; i < _pageSize; i++)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudPaper Class="pa-4 rounded-lg" Style="height: 230px;">
+                        <MudSkeleton Width="70%" Height="28px" Class="mb-2" />
+                        <MudSkeleton Width="40%" Height="20px" Class="mb-4" />
+                        <MudSkeleton Width="100%" Height="16px" />
+                        <MudSkeleton Width="90%" Height="16px" Class="mb-3" />
+                        <MudSkeleton Width="50%" Height="16px" />
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else if (!_templates.Any())
+    {
+        <MudPaper Class="pa-8 rounded-lg text-center" Elevation="0" Style="background: var(--mud-palette-background-grey);">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Class="mb-2 text-muted" />
+            <MudText Typo="Typo.h6" Class="mb-1">Шаблоны не найдены</MudText>
+            <MudText Typo="Typo.body2" Class="text-muted mb-3">
+                Попробуйте изменить поиск или фильтр по типу
+            </MudText>
+            @if (HasActiveFilters)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@ResetFilters">
+                    Сбросить фильтры
+                </MudButton>
+            }
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var template in _templates)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard Elevation="1" Class="@($"template-card type-{template.Type.ToString().ToLower()} h-100 d-flex flex-column")">
+                        <MudCardContent Class="flex-grow-1">
+                            <div class="d-flex align-start justify-space-between mb-2 gap-2" style="min-width: 0;">
+                                <div class="d-flex align-center gap-2" style="min-width: 0; width: 100%;">
+                                    <MudIcon Icon="@GetTypeIcon(template.Type)" Color="@GetTypeColor(template.Type)" Class="flex-shrink-0" />
+        
+                                    <!-- Всплывающая подсказка при наведении -->
+                                    <MudTooltip Text="@template.Title" Arrow="true" Placement="Placement.Top">
+                                        <MudText Typo="Typo.h6" Class="card-title mud-text-truncate" Style="width: 100%;">
+                                            @template.Title
+                                        </MudText>
+                                    </MudTooltip>
+                                </div>
+                            </div>
+
+
+                            <div class="d-flex gap-1 mb-2 flex-wrap">
+                                <MudChip T="string" Size="Size.Small" Color="@GetTypeColor(template.Type)" Variant="Variant.Filled">
+                                    @GetTypeDisplayName(template.Type)
+                                </MudChip>
+                                @if (template.IsPopular)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.LocalFireDepartment">
+                                        Популярный
+                                    </MudChip>
+                                }
+                                @if (template.IsNew)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.AutoAwesome">
+                                        Новый
+                                    </MudChip>
+                                }
+                            </div>
+
+                            <MudText Typo="Typo.body2" Class="text-muted card-description mb-3">
+                                @template.Description
+                            </MudText>
+
+                            <div class="d-flex align-center gap-2 mb-1">
+                                <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Small" Class="text-muted" />
+                                <MudText Typo="Typo.caption" Class="text-muted">
+                                    Использован @template.UsageCount раз(а)
+                                </MudText>
+                            </div>
+
+                            <div class="d-flex align-center gap-2 mb-1">
+                                <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="text-muted" />
+                                <MudText Typo="Typo.caption" Class="text-muted">
+                                    @template.CreatedAtUtc.ToString("dd.MM.yyyy")
+                                </MudText>
+                            </div>
+
+                            @if (template.HintsCount > 0)
+                            {
+                                <div class="d-flex align-center gap-2 mt-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.TipsAndUpdates" Size="Size.Small" Color="Color.Info" />
+                                    <MudText Typo="Typo.caption" Color="Color.Info">
+                                        @template.HintsCount подсказок
+                                    </MudText>
+                                </div>
+                            }
+                        </MudCardContent>
+
+                        <MudCardActions Class="border-top pa-2 gap-1">
+                            <MudButton StartIcon="@Icons.Material.Filled.Visibility"
+                                       Color="Color.Default"
+                                       Variant="Variant.Text"
+                                       Size="Size.Small"
+                                       OnClick="@(() => ViewTemplate(template.Id))"
+                                       FullWidth>
+                                Просмотр
+                            </MudButton>
+                            <MudButton StartIcon="@Icons.Material.Filled.Add"
+                                       Color="Color.Primary"
+                                       Variant="Variant.Filled"
+                                       Size="Size.Small"
+                                       OnClick="@(() => UseTemplate(template.Id))"
+                                       FullWidth>
+                                Использовать
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+
+        <div class="d-flex flex-column align-center mt-4 gap-2">
+            <MudPagination Selected="@_page"
+                           Count="@_totalPages"
+                           SelectedChanged="@OnPaginationChanged"
+                           Size="Size.Medium"
+                           Color="Color.Primary" />
+            <MudText Typo="Typo.caption" Class="text-muted">
+                Показано @Math.Min((_page - 1) * _pageSize + 1, _totalItems)–@Math.Min(_page * _pageSize, _totalItems) из @_totalItems
+            </MudText>
+        </div>
+    }
+</div>
+
+@code {
+    private List<DocumentTemplateDto> _templates = new();
+    private int _totalItems;
+    private int _totalPages => Math.Max(1, (_totalItems + _pageSize - 1) / _pageSize);
+    private bool _isLoading;
+    private bool _isRefreshing;
+    private int MinSpinMs = 600;
+
+    private string _searchTerm = string.Empty;
+    private DocumentType? _selectedType;
+    private string _sortField = "Title";
+    private bool _sortAscending = true;
+    private int _page = 1;
+    private readonly int _pageSize = 12;
+
+    private async Task OnRefreshClick()
+    {
+        if (_isRefreshing) return;
+
+        _isRefreshing = true;
+        StateHasChanged();
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        await LoadData();
+
+        var remaining = MinSpinMs - (int)sw.ElapsedMilliseconds;
+        if (remaining > 0)
+            await Task.Delay(remaining);
+
+        _isRefreshing = false;
+        StateHasChanged();
+    }
+
+    private string ArrowRotationStyle =>
+        $"transform: rotate({(_sortAscending ? 0 : 180)}deg); " +
+        "transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);";
+
+    private string RefreshSpinStyle =>
+        $"transform: rotate({(_isRefreshing ? 360 : 0)}deg); " +
+        "transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);";
+    
+    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_searchTerm) || _selectedType.HasValue;
+
+    private static readonly (string Field, string Label)[] SortOptions =
+    {
+        ("Title", "По названию"),
+        ("Type", "По типу"),
+        ("UsageCount", "По использованию"),
+        ("CreatedAtUtc", "По дате")
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            var (items, total) = await CatalogService.GetTemplatesAsync(
+                _searchTerm, _selectedType, _page, _pageSize, _sortField, _sortAscending);
+
+            _templates = items.ToList();
+            _totalItems = total;
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnSearchDebounced(string value)
+    {
+        _page = 1;
+        await LoadData();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            _page = 1;
+            await LoadData();
+        }
+    }
+
+    private async Task OnSearchCleared()
+    {
+        _searchTerm = string.Empty;
+        _page = 1;
+        await LoadData();
+    }
+
+    private async Task ClearTypeFilter()
+    {
+        _selectedType = null;
+        _page = 1;
+        await LoadData();
+    }
+
+    private async Task ResetFilters()
+    {
+        _searchTerm = string.Empty;
+        _selectedType = null;
+        _page = 1;
+        await LoadData();
+    }
+
+    private async Task OnFilterChanged(DocumentType? type)
+    {
+        _selectedType = type;
+        _page = 1;
+        await LoadData();
+    }
+
+    private async Task OnPaginationChanged(int page)
+    {
+        _page = page;
+        await LoadData();
+    }
+
+    private async void SetSort(string field)
+    {
+        if (_sortField == field)
+            _sortAscending = !_sortAscending;
+        else
+        {
+            _sortField = field;
+            _sortAscending = true;
+        }
+        _page = 1;
+        await LoadData();
+    }
+
+    private async Task ToggleSortDirection()
+    {
+        _sortAscending = !_sortAscending;
+        _page = 1;
+        await LoadData();
+    }
+
+    private bool IsCurrentSort(string field) => _sortField == field;
+
+    private string GetDirectionIcon() =>
+        _sortAscending ? Icons.Material.Filled.ArrowUpward : Icons.Material.Filled.ArrowDownward;
+
+    private string GetSortLabel() =>
+        SortOptions.FirstOrDefault(x => x.Field == _sortField).Label ?? "Сортировка";
+
+    private void ViewTemplate(Guid id) => NavigationManager.NavigateTo($"/templates/view/{id}");
+    private void UseTemplate(Guid id) => NavigationManager.NavigateTo($"/documents/create?templateId={id}");
+
+    private static string GetTypeDisplayName(DocumentType type) => type switch
+    {
+        DocumentType.Contract => "Договор",
+        DocumentType.Claim => "Иск",
+        DocumentType.Policy => "Политика",
+        DocumentType.Agreement => "Соглашение",
+        DocumentType.Consent => "Согласие",
+        _ => "Прочее"
+    };
+
+    private static Color GetTypeColor(DocumentType type) => type switch
+    {
+        DocumentType.Contract => Color.Primary,
+        DocumentType.Claim => Color.Error,
+        DocumentType.Policy => Color.Warning,
+        DocumentType.Agreement => Color.Info,
+        DocumentType.Consent => Color.Success,
+        _ => Color.Dark
+    };
+
+    private static string GetTypeIcon(DocumentType type) => type switch
+    {
+        DocumentType.Contract => Icons.Material.Filled.Description,
+        DocumentType.Claim => Icons.Material.Filled.Gavel,
+        DocumentType.Policy => Icons.Material.Filled.Policy,
+        DocumentType.Agreement => Icons.Material.Filled.Handshake,
+        DocumentType.Consent => Icons.Material.Filled.HowToReg,
+        _ => Icons.Material.Filled.InsertDriveFile
+    };
+}

@@ -1,0 +1,19 @@
+﻿@page "/logout"
+@inject IHttpContextAccessor HttpContextAccessor
+@using Lex.Components.Auth
+@using Lex.Infrastructure.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IdentityService IdentityService
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var httpContext = HttpContextAccessor.HttpContext;
+        if (httpContext != null)
+            await IdentityService.LogoutAsync(httpContext);
+        ((PersistentAuthenticationStateProvider)AuthProvider).NotifyAuthenticationStateChanged();
+        NavigationManager.NavigateTo("/", true);
+    }
+}

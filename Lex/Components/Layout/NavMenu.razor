@@ -1,0 +1,163 @@
+﻿@using Lex.Components.Auth
+@inject UserContext UserContext
+@inject NavigationManager NavigationManager
+
+<MudNavMenu Class="nav-menu">
+    <div class="nav-scrollable">
+        <!-- Главная -->
+        <MudNavLink Href="/" Match="NavLinkMatch.All" Class="nav-link" Icon="@Icons.Material.Filled.Dashboard">
+            Дашборд
+        </MudNavLink>
+        
+        @if (UserContext.IsAuthenticated)
+        {
+            <!-- Раздел Документы -->
+            <MudText Typo="Typo.caption" Class="nav-section-title px-4 pt-4 pb-2">ДОКУМЕНТЫ</MudText>
+            
+            <MudNavLink Href="/documents/my" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.Description">
+                Мои документы
+            </MudNavLink>
+            
+            <MudNavLink Href="/templates" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.LibraryBooks">
+                Шаблоны
+            </MudNavLink>
+            
+            <MudNavLink Href="/documents/drafts" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.EditNote">
+                Черновики
+            </MudNavLink>
+            
+            <!-- Раздел Чек-листы -->
+            <MudText Typo="Typo.caption" Class="nav-section-title px-4 pt-4 pb-2">ЧЕК-ЛИСТЫ</MudText>
+            
+            <MudNavLink Href="/checklists/my" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.Checklist">
+                Мои чек-листы
+            </MudNavLink>
+            
+            <MudNavLink Href="/checklists/templates" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.PlaylistAddCheck">
+                Шаблоны чек-листов
+            </MudNavLink>
+            
+            <!-- Раздел Организации -->
+            <MudText Typo="Typo.caption" Class="nav-section-title px-4 pt-4 pb-2">ОРГАНИЗАЦИИ</MudText>
+            
+            <MudNavLink Href="/companies/my" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.Business">
+                Мои компании
+            </MudNavLink>
+            
+            <MudNavLink Href="/companies/public" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.Public">
+                Публичные компании
+            </MudNavLink>
+            
+            <!-- Раздел Пользователи -->
+            <MudText Typo="Typo.caption" Class="nav-section-title px-4 pt-4 pb-2">СООБЩЕСТВО</MudText>
+            
+            <MudNavLink Href="/users" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.People">
+                Пользователи
+            </MudNavLink>
+            
+            <!-- Раздел Аккаунт -->
+            <MudDivider Class="my-3 nav-divider"/>
+            <MudText Typo="Typo.caption" Class="nav-section-title px-4 pt-2 pb-2">АККАУНТ</MudText>
+            
+            <MudNavLink Href="/profile" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.Person">
+                Мой профиль
+            </MudNavLink>
+            
+            <MudNavLink Href="/profile/settings" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.Settings">
+                Настройки
+            </MudNavLink>
+
+            @if (UserContext.IsAdmin)
+            {
+                <!-- Админ-раздел -->
+                <MudDivider Class="my-3 nav-divider"/>
+                <MudText Typo="Typo.caption" Class="nav-section-title px-4 pt-2 pb-2">АДМИНИСТРИРОВАНИЕ</MudText>
+                
+                <MudNavLink Href="/admin/templates" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.Description">
+                    Шаблоны документов
+                </MudNavLink>
+                
+                <MudNavLink Href="/admin/checklists" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.PlaylistAddCheck">
+                    Шаблоны чек-листов
+                </MudNavLink>
+                
+                <MudNavLink Href="/admin/users" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.AdminPanelSettings">
+                    Управление пользователями
+                </MudNavLink>
+            }
+        }
+        else
+        {
+            <MudDivider Class="my-3 nav-divider"/>
+            <MudNavLink Href="/login" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.Login">
+                Войти
+            </MudNavLink>
+            <MudNavLink Href="/register" Match="NavLinkMatch.Prefix" Class="nav-link" Icon="@Icons.Material.Filled.AppRegistration">
+                Регистрация
+            </MudNavLink>
+        }
+    </div>
+    
+    
+    <div class="nav-footer">
+        
+        @if (UserContext.IsAuthenticated)
+        {
+            var user = UserContext.CurrentUser;
+            <div class="user-profile-footer @(_isLoggingOut ? "logging-out" : "")">
+                <MudAvatar Class="user-avatar" Color="Color.Primary" Size="Size.Small">
+                    @if (!string.IsNullOrEmpty(user?.Initials))
+                    {
+                        <MudText>@user.Initials</MudText>
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Person" Class="user-avatar-icon"/>
+                    }
+                </MudAvatar>
+                <div class="user-info">
+                    <MudText Class="user-name">@(user?.FullName ?? "Пользователь")</MudText>
+                    <MudText Class="user-email">@user?.Email</MudText>
+                </div>
+                <MudTooltip Text="Выйти из системы" Placement="Placement.Top">
+                    <MudIconButton 
+                        Icon="@Icons.Material.Filled.Logout" 
+                        Color="Color.Inherit"
+                        Class="@GetLogoutButtonClass()"
+                        OnClick="@LogoutAsync"
+                        aria-label="Выйти из системы"
+                        Size="Size.Small"/>
+                </MudTooltip>
+            </div>
+        }
+        else
+        {
+            <div class="guest-profile-footer">
+                <MudAvatar Class="user-avatar" Color="Color.Default" Size="Size.Small">
+                    <MudIcon Icon="@Icons.Material.Filled.PersonOutline" Class="user-avatar-icon"/>
+                </MudAvatar>
+                <div class="user-info">
+                    <MudText Class="user-name text-muted">Гость</MudText>
+                    <MudText Class="user-email">Войдите для доступа</MudText>
+                </div>
+            </div>
+        }
+    </div>
+</MudNavMenu>
+
+@code {
+    private bool _isLoggingOut = false;
+
+    private string GetLogoutButtonClass() => _isLoggingOut ? "logout-button logging-out" : "logout-button";
+
+    private async Task LogoutAsync()
+    {
+        if (_isLoggingOut) return;
+        _isLoggingOut = true;
+        StateHasChanged();
+
+        await Task.Delay(800);
+        NavigationManager.NavigateTo("/logout-hendler", forceLoad: true);
+        _isLoggingOut = false;
+    }
+}

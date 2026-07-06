@@ -1,0 +1,215 @@
+﻿@using Lex.Components.Auth
+@inherits LayoutComponentBase
+@inject UserContext UserContext
+@inject PersistentAuthenticationStateProvider AuthProvider
+@inject NavigationManager NavigationManager
+
+<MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode"/>
+<MudPopoverProvider/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton 
+            Icon="@Icons.Material.Filled.Menu" 
+            Color="Color.Inherit" 
+            Edge="Edge.Start" 
+            OnClick="@((e) => DrawerToggle())"
+            Class="@GetMenuIconClass()"/>
+        <MudText Typo="Typo.h5" Class="ml-3">LexFlow</MudText>
+        <MudSpacer/>
+        <MudIconButton 
+            Icon="@(DarkLightModeButtonIcon)" 
+            Color="Color.Inherit" 
+            OnClick="@DarkModeToggle"
+            Class="theme-toggle-icon"/>
+        @if (UserContext.IsAuthenticated)
+        {
+            <MudIconButton 
+                Icon="@Icons.Material.Filled.AccountCircle" 
+                Color="Color.Inherit" 
+                OnClick="@(() => NavigationManager.NavigateTo("/profile"))"
+                ToolTip="Профиль"/>
+        }
+        else
+        {
+            <MudIconButton 
+                Icon="@Icons.Material.Filled.Login" 
+                Color="Color.Inherit" 
+                OnClick="@(() => NavigationManager.NavigateTo("/login"))"
+                ToolTip="Войти"/>
+        }
+    </MudAppBar>
+    
+    <MudDrawer id="nav-drawer" @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <NavMenu/>
+    </MudDrawer>
+    
+    <MudMainContent Class="pt-16 pa-4">
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _isDarkMode = true;
+    private MudTheme? _theme = null;
+    private bool _isAnimating = false;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        _theme = new()
+        {
+            PaletteLight = _lightPalette,
+            PaletteDark = _darkPalette,
+            LayoutProperties = new LayoutProperties()
+        };
+    }
+
+    private async Task DrawerToggle()
+    {
+        _isAnimating = true;
+        _drawerOpen = !_drawerOpen;
+        await Task.Delay(300);
+        _isAnimating = false;
+        
+        StateHasChanged();
+    }
+
+    private string GetMenuIconClass()
+    {
+        var baseClass = "menu-icon";
+        if (_isAnimating)
+        {
+            return $"{baseClass} menu-icon-spin";
+        }
+        return baseClass;
+    }
+
+    private void DarkModeToggle()
+    {
+        _isDarkMode = !_isDarkMode;
+    }
+    
+
+    private readonly PaletteLight _lightPalette = new()
+    {
+        // Основные цвета
+        Primary = "#1a56db",           // LegalTech Blue - насыщенный синий
+        PrimaryContrastText = "#ffffff",
+        Secondary = "#3b82f6",        // Яркий синий для акцентов
+        Tertiary = "#60a5fa",         // Светло-синий для hover состояний
+
+        // Система черных и серых
+        Black = "#0f172a",           // Глубокий сине-черный для текста (Slate 900)
+        TextPrimary = "#1e293b",     // Основной текст (Slate 800)
+        TextSecondary = "#475569",   // Вторичный текст (Slate 600)
+        TextDisabled = "#94a3b8",    // Отключенный текст (Slate 400)
+
+        // Фоны и поверхности
+        AppbarBackground = "rgba(255,255,255,0.85)",
+        AppbarText = "#1e293b",
+        DrawerBackground = "#f8fafc",
+        DrawerText = "#334155",
+        DrawerIcon = "#64748b",
+        Background = "#ffffff",
+        Surface = "#f1f5f9",         // Легкий серо-голубой для карточек
+
+        // Дополнительные цвета для LegalTech
+        GrayLight = "#e2e8f0",       // Светлая граница (Slate 200)
+        GrayLighter = "#f8fafc",     // Очень светлый фон (Slate 50)
+        LinesDefault = "#cbd5e1",    // Линии и разделители (Slate 300)
+        Divider = "#e2e8f0",
+        TableLines = "#e2e8f0",
+
+        // Действия и состояния
+        ActionDefault = "#475569",
+        ActionDisabled = "#94a3b8",
+        ActionDisabledBackground = "#f1f5f9",
+
+        // Функциональные цвета
+        Info = "#3b82f6",
+        Success = "#059669",         // Emerald - для юридических документов (доверие)
+        Warning = "#d97706",         // Amber - внимание к важным дедлайнам
+        Error = "#dc2626",           // Red - критические ошибки в документах
+
+        // Специальные LegalTech акценты
+        Dark = "#1e293b",            // Для заголовков
+        DarkContrastText = "#f8fafc",
+
+        // Overlay и тени
+        OverlayLight = "rgba(15, 23, 42, 0.1)",
+        OverlayDark = "rgba(15, 23, 42, 0.5)",
+    };
+
+    private readonly PaletteDark _darkPalette = new()
+    {
+        // Основные цвета в тёмной теме
+        Primary = "#3b82f6",           // LegalTech Blue - яркий синий для тёмной темы
+        PrimaryContrastText = "#ffffff",
+        Secondary = "#60a5fa",         // Светло-синий акцент
+        Tertiary = "#93bbfd",          // Очень светлый синий для hover
+        
+        // Многослойная система чёрных (от светлого к тёмному)
+        Black = "#e2e8f0",            // Самый "чёрный" = белый текст в тёмной теме
+        TextPrimary = "#f1f5f9",      // Основной текст (почти белый)
+        TextSecondary = "#94a3b8",    // Вторичный текст (Slate 400)
+        TextDisabled = "#475569",     // Отключенный текст (Slate 600)
+        
+        // Многослойные тёмные фоны (от светлого к тёмному)
+        Background = "#0f172a",       // Самый глубокий фон - основной (Slate 900)
+        BackgroundGray = "#1e293b",   // Приподнятый фон (Slate 800)
+        Surface = "#1e293b",          // Карточки и панели (Slate 800)
+        DrawerBackground = "#0f172a", // Боковая панель в цвет основного фона
+        
+        // AppBar и навигация
+        AppbarBackground = "rgba(15, 23, 42, 0.9)",
+        AppbarText = "#f1f5f9",
+        DrawerText = "#cbd5e1",
+        DrawerIcon = "#64748b",
+        
+        // Линии и разделители (тоже с градацией)
+        LinesDefault = "#1e293b",     // Тонкие линии (почти сливаются с фоном)
+        TableLines = "#334155",       // Линии таблиц (чуть светлее)
+        Divider = "#1e293b",         // Разделители
+        
+        // Тёмные оттенки для разных уровней
+        GrayLight = "#334155",       // Светло-тёмный (Slate 700)
+        GrayLighter = "#1e293b",     // Очень тёмный (Slate 800)
+        
+        // Действия и состояния
+        ActionDefault = "#94a3b8",
+        ActionDisabled = "#475569",
+        ActionDisabledBackground = "#1e293b",
+        
+        // Функциональные цвета с корректировкой для тёмной темы
+        Info = "#60a5fa",
+        Success = "#34d399",         // Emerald - светлее для тёмной темы
+        Warning = "#fbbf24",         // Amber - ярче для контраста
+        Error = "#f87171",           // Red - мягче для глаз в тёмной теме
+        
+        // Специальные LegalTech акценты
+        Dark = "#f8fafc",
+        DarkContrastText = "#0f172a",
+        
+        // Overlay и эффекты
+        OverlayLight = "rgba(15, 23, 42, 0.8)",
+        OverlayDark = "rgba(0, 0, 0, 0.4)",
+    };
+
+    public string DarkLightModeButtonIcon => _isDarkMode switch
+    {
+        true => Icons.Material.Rounded.AutoMode,
+        false => Icons.Material.Outlined.DarkMode,
+    };
+
+}

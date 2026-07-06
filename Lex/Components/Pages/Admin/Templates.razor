@@ -1,0 +1,338 @@
+﻿@page "/admin/templates"
+@using Lex.Domain.Entities
+@using Lex.Domain.Enums
+@using Lex.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudText Typo="Typo.h3" Class="mb-2">Управление шаблонами документов</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+        Создание, редактирование и удаление шаблонов документов с советами
+    </MudText>
+
+    <MudPaper Class="pa-4 mb-6" Elevation="0">
+        <div class="d-flex align-center gap-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                       StartIcon="@Icons.Material.Filled.Add" 
+                       OnClick="@OpenCreateDialog" Class="rounded-lg">
+                Создать шаблон
+            </MudButton>
+            <MudSpacer/>
+            <MudTextField @bind-Value="_searchQuery" Placeholder="Поиск по названию..." 
+                          Immediate="true" Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Class="search-field" T="string"/>
+        </div>
+    </MudPaper>
+
+    @if (_templates == null)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-8"/>
+    }
+    else if (!_templates.Any())
+    {
+        <MudPaper Class="pa-8 text-center" Elevation="0">
+            <MudIcon Icon="@Icons.Material.Filled.Description" Class="empty-icon mb-4"/>
+            <MudText Typo="Typo.h6">Нет шаблонов</MudText>
+            <MudText Color="Color.Secondary">Создайте первый шаблон документа</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var template in _filteredTemplates)
+            {
+                <MudItem xs="12" sm="6" lg="4">
+                    <MudPaper Class="template-card pa-6" Elevation="0">
+                        <div class="d-flex justify-space-between align-start mb-3">
+                            <div class="flex-grow-1">
+                                <MudText Typo="Typo.h6">@template.Title</MudText>
+                                <MudChip T="string" Size="Size.Small" 
+                                         Color="Color.Info" Variant="Variant.Text" Class="mt-1 px-0">
+                                    @template.Type
+                                </MudChip>
+                            </div>
+                            <div class="d-flex gap-1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                               Size="Size.Small" Color="Color.Primary"
+                                               OnClick="@(() => OpenEditDialog(template))"/>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                               Size="Size.Small" Color="Color.Error"
+                                               OnClick="@(() => DeleteTemplate(template))"/>
+                            </div>
+                        </div>
+                        
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                            @(template.Description.Length > 120 
+                                ? template.Description[..120] + "..." 
+                                : template.Description)
+                        </MudText>
+                        
+                        <div class="d-flex align-center gap-4">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                <MudIcon Icon="@Icons.Material.Filled.Lightbulb" Size="Size.Small" Class="mr-1"/>
+                                @template.Hints.Count советов
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1"/>
+                                @template.CreatedAtUtc.ToString("dd.MM.yyyy")
+                            </MudText>
+                        </div>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+<MudDialog @bind-Visible="_dialogVisible" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @(_editingTemplate == null ? "Создание шаблона" : "Редактирование шаблона")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudContainer Class="pa-0">
+            <MudTextField @bind-Value="_editModel.Title" Label="Название" 
+                          Required="true" T="string" Class="mb-4"/>
+            
+            <MudTextField @bind-Value="_editModel.Description" Label="Описание" 
+                          Lines="2" T="string" Class="mb-4"/>
+            
+            <MudSelect @bind-Value="_editModel.Type" Label="Тип документа" T="DocumentType" Class="mb-4">
+                @foreach (DocumentType type in Enum.GetValues(typeof(DocumentType)))
+                {
+                    <MudSelectItem T="DocumentType" Value="type">@type</MudSelectItem>
+                }
+            </MudSelect>
+            
+            <MudTextField @bind-Value="_editModel.CurrentContent" Label="Содержимое (Markdown)" 
+                          Lines="6" T="string" Class="mb-4"/>
+            
+            <MudDivider Class="my-4"/>
+            
+            <div class="d-flex align-center justify-space-between mb-3">
+                <MudText Typo="Typo.subtitle2">Советы к шаблону</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="@AddHint">Добавить совет</MudButton>
+            </div>
+            
+            @if (_editModel.Hints.Any())
+            {
+                <MudList T="string">
+                    @for (int i = 0; i < _editModel.Hints.Count; i++)
+                    {
+                        var index = i;
+                        <MudListItem T="string" Class="hint-row">
+                            <div class="d-flex flex-column gap-2 w-100">
+                                <div class="d-flex gap-3 align-start">
+                                    <MudText Typo="Typo.caption" Class="hint-order">@(index + 1)</MudText>
+                                    <MudTextField @bind-Value="_editModel.Hints[index].Text" 
+                                                  Label="Текст совета" T="string"
+                                                  Lines="2" Class="flex-grow-1"/>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                   Size="Size.Small" Color="Color.Error"
+                                                   OnClick="@(() => RemoveHint(index))"/>
+                                </div>
+                                <div class="d-flex gap-2 pl-7">
+                                    <MudSelect @bind-Value="_editModel.Hints[index].Importance" 
+                                               Label="Важность" T="HintImportance"
+                                               Class="flex-grow-1">
+                                        @foreach (HintImportance imp in Enum.GetValues(typeof(HintImportance)))
+                                        {
+                                            <MudSelectItem T="HintImportance" Value="imp">@imp</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </div>
+                            </div>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@CancelDialog" Color="Color.Secondary">Отмена</MudButton>
+        <MudButton OnClick="@SaveTemplate" Variant="Variant.Filled" Color="Color.Primary"
+                   Disabled="@(string.IsNullOrWhiteSpace(_editModel.Title))">
+            Сохранить
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<DocumentTemplate>? _templates;
+    private string _searchQuery = string.Empty;
+    private bool _dialogVisible;
+    private DocumentTemplate? _editingTemplate;
+    private TemplateEditModel _editModel = new();
+    
+    private DialogOptions _dialogOptions = new() 
+    { 
+        MaxWidth = MaxWidth.Large, 
+        FullWidth = true,
+        CloseButton = true,
+        CloseOnEscapeKey = true
+    };
+
+    private List<DocumentTemplate> _filteredTemplates => 
+        _templates?.Where(t => 
+            string.IsNullOrWhiteSpace(_searchQuery) || 
+            t.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(t => t.UpdatedAtUtc ?? t.CreatedAtUtc)
+        .ToList() ?? new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTemplates();
+    }
+
+    private async Task LoadTemplates()
+    {
+        _templates = await Task.Run(() => 
+            Db.DocumentTemplates.Include(t => t.Hints)
+                .Where(t => !t.IsDeleted)
+                .ToList());
+    }
+
+    private void OpenCreateDialog()
+    {
+        _editingTemplate = null;
+        _editModel = new TemplateEditModel();
+        _dialogVisible = true;
+    }
+
+    private void OpenEditDialog(DocumentTemplate template)
+    {
+        _editingTemplate = template;
+        _editModel = new TemplateEditModel
+        {
+            Title = template.Title,
+            Description = template.Description,
+            Type = template.Type,
+            CurrentContent = template.CurrentContent,
+            Hints = template.Hints.Select(h => new HintModel
+            {
+                Text = h.Text,
+                Order = h.Order,
+                Importance = h.Importance
+            }).ToList()
+        };
+        _dialogVisible = true;
+    }
+
+    private async Task SaveTemplate()
+    {
+        if (string.IsNullOrWhiteSpace(_editModel.Title))
+            return;
+
+        if (_editingTemplate == null)
+        {
+            var template = new DocumentTemplate
+            {
+                Id = Guid.NewGuid(),
+                Title = _editModel.Title,
+                Description = _editModel.Description,
+                Type = _editModel.Type,
+                CurrentContent = _editModel.CurrentContent,
+                CreatedAtUtc = DateTime.UtcNow,
+                Hints = _editModel.Hints.Select((hint, index) => new TemplateHint
+                {
+                    Id = Guid.NewGuid(),
+                    Text = hint.Text,
+                    Order = index + 1,
+                    Importance = hint.Importance,
+                    CreatedAtUtc = DateTime.UtcNow
+                }).ToList()
+            };
+            
+            Db.DocumentTemplates.Add(template);
+            Snackbar.Add("Шаблон создан", Severity.Success);
+        }
+        else
+        {
+            var template = await Task.Run(() => 
+                Db.DocumentTemplates
+                    .Include(t => t.Hints)
+                    .First(t => t.Id == _editingTemplate.Id));
+            
+            template.Title = _editModel.Title;
+            template.Description = _editModel.Description;
+            template.Type = _editModel.Type;
+            template.CurrentContent = _editModel.CurrentContent;
+            template.UpdatedAtUtc = DateTime.UtcNow;
+            
+            Db.TemplateHints.RemoveRange(template.Hints);
+            
+            template.Hints = _editModel.Hints.Select((hint, index) => new TemplateHint
+            {
+                Id = Guid.NewGuid(),
+                DocumentTemplateId = template.Id,
+                Text = hint.Text,
+                Order = index + 1,
+                Importance = hint.Importance,
+                CreatedAtUtc = DateTime.UtcNow
+            }).ToList();
+            
+            Snackbar.Add("Шаблон обновлен", Severity.Success);
+        }
+        
+        await Db.SaveChangesAsync();
+        _dialogVisible = false;
+        await LoadTemplates();
+    }
+
+    private async Task DeleteTemplate(DocumentTemplate template)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Подтверждение удаления",
+            $"Удалить шаблон «{template.Title}»? Это действие нельзя отменить.",
+            yesText: "Удалить",
+            cancelText: "Отмена");
+        
+        if (result == true)
+        {
+            template.IsDeleted = true;
+            template.UpdatedAtUtc = DateTime.UtcNow;
+            await Db.SaveChangesAsync();
+            await LoadTemplates();
+            Snackbar.Add("Шаблон удален", Severity.Warning);
+        }
+    }
+
+    private void CancelDialog()
+    {
+        _dialogVisible = false;
+        _editModel = new TemplateEditModel();
+    }
+
+    private void AddHint()
+    {
+        _editModel.Hints.Add(new HintModel { Order = _editModel.Hints.Count + 1 });
+    }
+
+    private void RemoveHint(int index)
+    {
+        _editModel.Hints.RemoveAt(index);
+    }
+
+    private class TemplateEditModel
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public DocumentType Type { get; set; } = DocumentType.Other;
+        public string CurrentContent { get; set; } = string.Empty;
+        public List<HintModel> Hints { get; set; } = new();
+    }
+
+    private class HintModel
+    {
+        public string Text { get; set; } = string.Empty;
+        public int Order { get; set; }
+        public HintImportance Importance { get; set; } = HintImportance.Info;
+    }
+}

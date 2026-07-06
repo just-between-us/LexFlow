@@ -1,0 +1,160 @@
+﻿@page "/register"
+@using Lex.Application.DTOs
+@using Lex.Infrastructure.Services
+@inject IdentityService IdentityService
+@inject NavigationManager NavigationManager
+
+<div style="display: flex; justify-content: center; align-items: center; height: 80vh">
+    <MudPaper MaxWidth="80%" Class="pa-8" Style="border-radius: 16px;">
+        <MudText Typo="Typo.h4" Class="mb-2 text-center" Color="Color.Primary">
+            Создайте аккаунт
+        </MudText>
+        <MudText Typo="Typo.body2" Class="mb-6 text-center text-muted">
+            Начните работу с Lex за 2 минуты
+        </MudText>
+
+        <EditForm Model="@_RegisterModel" OnValidSubmit="@HandleRegister" Class="auth-form">
+            <DataAnnotationsValidator />
+
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">
+                    @ErrorMessage
+                </MudAlert>
+            }
+
+            <MudTextField @bind-Value="_RegisterModel.Email"
+                          Label="Email"
+                          Variant="Variant.Outlined"
+                          HelperText="Введите действующий email"
+                          For="@(() => _RegisterModel.Email)"
+                          Icon="@Icons.Material.Filled.Email"
+                          Margin="Margin.Dense"
+                          Class="mb-4" />
+
+            <MudTextField @bind-Value="_RegisterModel.Password"
+                          Label="Пароль"
+                          Variant="Variant.Outlined"
+                          HelperText="От 6 символов, с цифрой и заглавной буквой"
+                          For="@(() => _RegisterModel.Password)"
+                          InputType="InputType.Password"
+                          Icon="@Icons.Material.Filled.Lock"
+                          Margin="Margin.Dense"
+                          Class="mb-4" />
+
+            <MudTextField @bind-Value="_RegisterModel.ConfirmPassword"
+                          Label="Подтвердите пароль"
+                          Variant="Variant.Outlined"
+                          For="@(() => _RegisterModel.ConfirmPassword)"
+                          InputType="InputType.Password"
+                          Icon="@Icons.Material.Filled.Verified"
+                          Margin="Margin.Dense"
+                          Class="mb-4" />
+
+            <MudTextField @bind-Value="_RegisterModel.FirstName"
+                          Label="Имя (опционально)"
+                          Variant="Variant.Outlined"
+                          HelperText="Как к вам обращаться"
+                          Icon="@Icons.Material.Filled.Person"
+                          Margin="Margin.Dense"
+                          Class="mb-4" />
+
+            <MudTextField @bind-Value="_RegisterModel.LastName"
+                          Label="Фамилия (опционально)"
+                          Variant="Variant.Outlined"
+                          Icon="@Icons.Material.Filled.PersonOutline"
+                          Margin="Margin.Dense"
+                          Class="mb-4" />
+
+            <div class="d-flex align-items-center mb-4" style="align-items: center;">
+                <MudCheckBox @bind-Value="_RegisterModel.AcceptTerms"
+                             Color="Color.Primary"
+                             Class="mr-2" />
+                <MudText Typo="Typo.body2" Class="text-muted">
+                    Я принимаю
+                    <a href="/terms" class="mud-typography mud-typography-body2 mud-link mud-link-underline-hover mud-primary-text">
+                        условия использования
+                    </a>
+                    и
+                    <a href="/privacy" class="mud-typography mud-typography-body2 mud-link mud-link-underline-hover mud-primary-text">
+                        политику конфиденциальности
+                    </a>
+                </MudText>
+            </div>
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       FullWidth="true"
+                       Disabled="@(IsProcessing || !_RegisterModel.AcceptTerms)"
+                       Class="mb-3">
+                @if (IsProcessing)
+                {
+                    <MudProgressCircular Size="Size.Small" Class="mr-2" Color="Color.Inherit" />
+                    <span>Регистрация...</span>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.AppRegistration" Class="mr-2" />
+                    <span>Зарегистрироваться</span>
+                }
+            </MudButton>
+
+            <div style="text-align: center">
+                <MudText Typo="Typo.body2" Class="text-muted">
+                    Уже есть аккаунт?
+                    <a href="/login" class="mud-typography mud-typography-body2 mud-link mud-link-underline-hover mud-primary-text">
+                        Войти
+                    </a>
+                </MudText>
+            </div>
+        </EditForm>
+    </MudPaper>
+</div>
+
+@code {
+    private RegisterModel _RegisterModel { get; set; } = new();
+    private string? ErrorMessage { get; set; }
+    private bool IsProcessing { get; set; }
+
+    private async Task HandleRegister()
+    {
+        if (IsProcessing) return;
+
+        if (_RegisterModel.Password != _RegisterModel.ConfirmPassword)
+        {
+            ErrorMessage = "Пароли не совпадают";
+            return;
+        }
+
+        IsProcessing = true;
+        ErrorMessage = null;
+
+        try
+        {
+            var (success, error, user) = await IdentityService.RegisterAsync(
+                _RegisterModel.Email,
+                _RegisterModel.Password,
+                _RegisterModel.FirstName,
+                _RegisterModel.LastName);
+
+            if (success)
+            {
+                NavigationManager.NavigateTo("/login?registered=true", true);
+            }
+            else
+            {
+                ErrorMessage = error;
+            }
+        }
+        catch (Exception)
+        {
+            ErrorMessage = "Произошла ошибка при регистрации. Попробуйте позже.";
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+}

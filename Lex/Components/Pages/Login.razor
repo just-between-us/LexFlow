@@ -1,0 +1,126 @@
+﻿@page "/login"
+<div style="display: flex; justify-content: center; align-items: center; height: 80vh">
+    
+<MudPaper Class="auth-paper pa-8" Elevation="3" Square="false">
+    <MudText Typo="Typo.h4" Class="mb-4 text-center" Color="Color.Primary">
+        <MudIcon Icon="@Icons.Material.Filled.Gavel" Size="Size.Large" Class="mr-2" />
+        Добро пожаловать!
+    </MudText>
+    <MudText Typo="Typo.body2" Class="mb-6 text-center text-muted">
+        Войдите в свой аккаунт, чтобы продолжить
+    </MudText>
+
+    @if (!string.IsNullOrEmpty(SuccessMessage))
+    {
+        <MudAlert Severity="Severity.Success" Class="mb-4" Variant="Variant.Filled">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
+            @SuccessMessage
+        </MudAlert>
+    }
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4" Variant="Variant.Filled">
+            <MudIcon Icon="@Icons.Material.Filled.Error" Class="mr-2" />
+            @ErrorMessage
+        </MudAlert>
+    }
+
+    <form method="post" action="/login-handler" class="auth-form">
+        <div class="mb-4">
+            <div class="d-flex">
+                <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" Class="mr-1" Color="Color.Primary"/>
+                <MudText Typo="Typo.body2" Class="mb-1 font-weight-medium">
+                    Email
+                </MudText>
+            </div>
+            <div class="auth-input-wrapper">
+                <input type="email"
+                       id="email"
+                       name="email"
+                       class="auth-input"
+                       placeholder="example@mail.ru"
+                       required
+                       autofocus/>
+            </div>
+            <div class=" mt-2">
+                <MudText Typo="Typo.caption" Class="text-muted">
+                    Введите адрес электронной почты
+                </MudText>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <div class="d-flex">
+                <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Class="mr-1" Color="Color.Primary"/>
+                <MudText Typo="Typo.body2" Class="mb-1 font-weight-medium">
+                    Пароль
+                </MudText>
+            </div>
+            <div class="auth-input-wrapper">
+                <input type="password"
+                       id="password"
+                       name="password"
+                       class="auth-input"
+                       placeholder="••••••••"
+                       required/>
+            </div>
+            <div class="d-flex justify-content-between mt-2" style="justify-content: space-between;">
+                <MudText Typo="Typo.caption" Class="text-muted">
+                    Минимум 6 символов
+                </MudText>
+                <a href="/forgot-password" class="mud-typography mud-typography-caption mud-link mud-link-underline-hover mud-primary-text">
+                    Забыли пароль?
+                </a>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center mb-4">
+            <input type="checkbox" 
+                   id="rememberMe" 
+                   name="rememberMe" 
+                   class="auth-checkbox" />
+            <label for="rememberMe" class="auth-checkbox-label">
+                Запомнить меня
+            </label>
+        </div>
+
+        <MudButton ButtonType="ButtonType.Submit" 
+                   Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   Size="Size.Large" 
+                   FullWidth="true" 
+                   Class="auth-submit-btn mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.Login" Class="mr-2" />
+            Войти
+        </MudButton>
+
+        <div class="text-center" style="text-align: center;">
+            <MudText Typo="Typo.body2" Class="text-muted">
+                Нет аккаунта?
+                <a href="/register" class="mud-typography mud-typography-body2 mud-link mud-link-underline-hover mud-primary-text font-weight-medium">
+                    Зарегистрироваться
+                </a>
+            </MudText>
+        </div>
+    </form>
+</MudPaper>
+
+</div>
+@code {
+    [SupplyParameterFromQuery]
+    public string? ErrorMessage { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Registered { get; set; }
+
+    private string? SuccessMessage { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (Registered == "true")
+        {
+            SuccessMessage = "Регистрация прошла успешно! Теперь вы можете войти.";
+        }
+    }
+}

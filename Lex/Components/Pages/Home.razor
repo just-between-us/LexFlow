@@ -1,0 +1,214 @@
+﻿@page "/"
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="home-page py-8">
+    
+    <!-- Hero секция -->
+    <div Class="hero-section pa-8 mb-8" Elevation="0">
+        <MudGrid>
+            <MudItem xs="12" md="7">
+                <MudText Typo="Typo.h2" Class="hero-title mb-4">
+                    <span class="text-gradient">LexFlow</span>
+                </MudText>
+                <MudText Typo="Typo.h3" Class="hero-title mb-4">
+                    ваш юридический помощник
+                </MudText>
+                <MudText Typo="Typo.h6" Class="hero-subtitle mb-6">
+                    LegalTech-приложение для начинающих предпринимателей. 
+                    Создавайте документы по шаблонам, проходите бизнес‑инструкции 
+                    и работайте с командой в едином пространстве.
+                </MudText>
+                <div class="hero-actions">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" 
+                               Href="documents/templates" Class="mr-3 rounded-xl">
+                        <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Class="mr-2"/>
+                        Каталог шаблонов
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Large" 
+                               Href="dashboard" Class="rounded-xl">
+                        <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="mr-2"/>
+                        Дашборд
+                    </MudButton>
+                </div>
+            </MudItem>
+            <MudItem xs="12" md="5" Class="d-flex align-center justify-center">
+                <MudIcon Icon="@Icons.Material.Filled.Gavel" Class="hero-icon"/>
+            </MudItem>
+        </MudGrid>
+    </div>
+
+    <!-- Основные функции -->
+    <MudExpansionPanels MultiExpansion="true" Elevation="0" Class="section-panels mb-8">
+        <MudExpansionPanel Text="@string.Empty" >
+            <TitleContent>
+                <div class="section-header" >
+                    <MudText Typo="Typo.h4" Class="section-title mb-0">Основные функции</MudText>
+                    <MudText Class="section-subtitle mt-1" Typo="Typo.body2">
+                        Ключевые возможности для работы с документами и чек-листами
+                    </MudText>
+                </div>
+            </TitleContent>
+            <ChildContent>
+                <MudGrid Class="mt-4">
+                    <!-- Шаблоны документов -->
+                    <MudItem xs="12" sm="6" lg="4">
+                        <MudPaper Class="feature-card pa-6" Elevation="0">
+                            <div class="feature-icon-wrapper mb-4">
+                                <MudIcon Icon="@Icons.Material.Filled.Description" Class="feature-icon"/>
+                            </div>
+                            <MudText Typo="Typo.h6" Class="mb-2">Каталог шаблонов</MudText>
+                            <MudText Class="feature-description mb-4">
+                                Просматривайте публичные шаблоны документов с поиском и фильтрацией. 
+                                Выбирайте подходящий шаблон для вашего бизнеса.
+                            </MudText>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="documents/templates" 
+                                       EndIcon="@Icons.Material.Filled.ArrowForward" Class="pl-0">
+                                Перейти
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+
+                    <!-- Чек-листы -->
+                    <MudItem xs="12" sm="6" lg="4">
+                        <MudPaper Class="feature-card pa-6" Elevation="0">
+                            <div class="feature-icon-wrapper mb-4">
+                                <MudIcon Icon="@Icons.Material.Filled.Checklist" Class="feature-icon"/>
+                            </div>
+                            <MudText Typo="Typo.h6" Class="mb-2">Интерактивные чек-листы</MudText>
+                            <MudText Class="feature-description mb-4">
+                                Проходите пошаговые бизнес‑инструкции, отмечайте прогресс 
+                                и добавляйте заметки. Автосохранение на каждом шагу.
+                            </MudText>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="checklists/templates" 
+                                       EndIcon="@Icons.Material.Filled.ArrowForward" Class="pl-0">
+                                Перейти
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+
+                    <!-- Версионирование -->
+                    <MudItem xs="12" sm="6" lg="4">
+                        <MudPaper Class="feature-card pa-6" Elevation="0">
+                            <div class="feature-icon-wrapper mb-4">
+                                <MudIcon Icon="@Icons.Material.Filled.History" Class="feature-icon"/>
+                            </div>
+                            <MudText Typo="Typo.h6" Class="mb-2">Версионирование</MudText>
+                            <MudText Class="feature-description mb-4">
+                                Отслеживайте историю изменений документов, просматривайте версии 
+                                с указанием автора и времени, восстанавливайте любую редакцию.
+                            </MudText>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="documents/my" 
+                                       EndIcon="@Icons.Material.Filled.ArrowForward" Class="pl-0">
+                                Мои документы
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </ChildContent>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+
+    <!-- Совместная работа -->
+    <MudExpansionPanels MultiExpansion="true" Elevation="0" Class="section-panels mb-8">
+        <MudExpansionPanel Text="@string.Empty">
+            <TitleContent>
+                <div class="section-header">
+                    <MudText Typo="Typo.h4" Class="section-title mb-0">Совместная работа</MudText>
+                    <MudText Class="section-subtitle mt-1" Typo="Typo.body2">
+                        Приглашайте команду и управляйте доступом к документам
+                    </MudText>
+                </div>
+            </TitleContent>
+            <ChildContent>
+                <MudGrid Class="mt-4">
+                    <MudItem xs="12" md="6">
+                        <MudPaper Class="feature-card-horizontal pa-6" Elevation="0">
+                            <div class="d-flex gap-4">
+                                <div class="feature-icon-wrapper">
+                                    <MudIcon Icon="@Icons.Material.Filled.Business" Class="feature-icon"/>
+                                </div>
+                                <div>
+                                    <MudText Typo="Typo.h6" Class="mb-2">Работа в компаниях</MudText>
+                                    <MudText Class="feature-description mb-4">
+                                        Приглашайте участников в компанию, управляйте доступом 
+                                        к документам и чек‑листам. Выбирайте видимость.
+                                    </MudText>
+                                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="companies/my" 
+                                               EndIcon="@Icons.Material.Filled.ArrowForward" Class="pl-0">
+                                        Мои компании
+                                    </MudButton>
+                                </div>
+                            </div>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudPaper Class="feature-card-horizontal pa-6" Elevation="0">
+                            <div class="d-flex gap-4">
+                                <div class="feature-icon-wrapper">
+                                    <MudIcon Icon="@Icons.Material.Filled.Public" Class="feature-icon"/>
+                                </div>
+                                <div>
+                                    <MudText Typo="Typo.h6" Class="mb-2">Публичный профиль</MudText>
+                                    <MudText Class="feature-description mb-4">
+                                        Просматривайте публичные организации и пользователей, 
+                                        знакомьтесь с их документами и чек‑листами.
+                                    </MudText>
+                                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="companies/public" 
+                                               EndIcon="@Icons.Material.Filled.ArrowForward" Class="pl-0">
+                                        Поиск компаний
+                                    </MudButton>
+                                </div>
+                            </div>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </ChildContent>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+
+    <!-- Дополнительно -->
+    <MudExpansionPanels MultiExpansion="true" Elevation="0" Class="section-panels mb-8">
+        <MudExpansionPanel Text="@string.Empty">
+            <TitleContent>
+                <div class="section-header">
+                    <MudText Typo="Typo.h4" Class="section-title mb-0">Дополнительно</MudText>
+                    <MudText Class="section-subtitle mt-1" Typo="Typo.body2">
+                        Черновики, профили пользователей и настройки
+                    </MudText>
+                </div>
+            </TitleContent>
+            <ChildContent>
+                <MudGrid Class="mt-4">
+                    <MudItem xs="12" sm="6" lg="3">
+                        <MudPaper Class="mini-card pa-4" Elevation="0" Href="documents/drafts">
+                            <MudIcon Icon="@Icons.Material.Filled.EditNote" Class="mini-icon mb-2"/>
+                            <MudText Typo="Typo.body1" Class="font-weight-bold mb-1">Черновики</MudText>
+                            <MudText Typo="Typo.caption">Сохраняйте и возвращайтесь</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" lg="3">
+                        <MudPaper Class="mini-card pa-4" Elevation="0" Href="users">
+                            <MudIcon Icon="@Icons.Material.Filled.People" Class="mini-icon mb-2"/>
+                            <MudText Typo="Typo.body1" Class="font-weight-bold mb-1">Пользователи</MudText>
+                            <MudText Typo="Typo.caption">Поиск и просмотр профилей</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" lg="3">
+                        <MudPaper Class="mini-card pa-4" Elevation="0" Href="profile">
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Class="mini-icon mb-2"/>
+                            <MudText Typo="Typo.body1" Class="font-weight-bold mb-1">Профиль</MudText>
+                            <MudText Typo="Typo.caption">Управляйте личными данными</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" lg="3">
+                        <MudPaper Class="mini-card pa-4" Elevation="0" Href="profile/settings">
+                            <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mini-icon mb-2"/>
+                            <MudText Typo="Typo.body1" Class="font-weight-bold mb-1">Настройки</MudText>
+                            <MudText Typo="Typo.caption">Персонализируйте приложение</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </ChildContent>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+
+</MudContainer>

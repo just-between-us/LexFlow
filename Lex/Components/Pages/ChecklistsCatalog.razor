@@ -1,0 +1,423 @@
+﻿@page "/checklists/templates"
+@using Lex.Components.Dialogs
+@using Lex.Domain.DTOs
+@using Lex.Domain.Interfaces
+@inject IChecklistCatalogService CatalogService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+
+<PageTitle>Каталог чек-листов</PageTitle>
+<div class="checklists-page">
+    <div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
+        <div>
+            <MudText Typo="Typo.h4">Каталог чек-листов</MudText>
+            <MudText Typo="Typo.body2" Class="text-muted">
+                Интерактивные инструкции для вашего бизнеса
+            </MudText>
+        </div>
+    </div>
+
+    <MudPaper Class="pa-4 mb-3 rounded-lg toolbar-panel" Elevation="0">
+        <MudStack Row="true" Spacing="2" Class="align-center flex-wrap">
+            <MudTextField @bind-Value="_searchTerm"
+                          Label="Поиск"
+                          Placeholder="Название или описание..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          DebounceInterval="350"
+                          OnDebounceIntervalElapsed="OnSearchDebounced"
+                          OnKeyUp="OnSearchKeyUp"
+                          Clearable="true"
+                          OnClearButtonClick="@(() => OnSearchCleared())"
+                          Variant="Variant.Outlined"
+                          Class="flex-grow-1"
+                          Style="min-width: 220px;"/>
+
+            <MudSelect T="string" 
+                       Label="Теги"
+                       SelectedValues="_selectedChips"
+                       Variant="Variant.Outlined"
+                       Class="flex-shrink-0"
+                       Style="min-width: 180px;"
+                       MultiSelection="true"
+                       ToStringFunc="@(item => string.IsNullOrEmpty(item) ? "Все теги" : item)"
+                       SelectedValuesChanged="OnChipsChanged!">
+                @foreach (var chip in _availableChips)
+                {
+                    <MudSelectItem Value="@chip">@chip</MudSelectItem>
+                }
+            </MudSelect>
+
+
+            <MudDivider Vertical="true" Class="mx-1 d-none d-md-flex" />
+
+            <MudTooltip Text="Порядок отображения">
+                <MudMenu Label="@GetSortLabel()"
+                         Icon="@Icons.Material.Filled.Sort"
+                         EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                         Variant="Variant.Text"
+                         Class="flex-shrink-0 rounded-button-hover-scale">
+                    @foreach (var (field, label) in SortOptions)
+                    {
+                        <MudMenuItem OnClick="@(() => SetSort(field))">
+                            <span class="d-flex align-center">
+                                @label
+                                @if (IsCurrentSort(field))
+                                {
+                                    <MudIcon Icon="@GetDirectionIcon()" Size="Size.Small" Class="ml-2" />
+                                }
+                            </span>
+                        </MudMenuItem>
+                    }
+                </MudMenu>
+            </MudTooltip>
+
+            <MudTooltip Text="@(_sortAscending ? "По возрастанию" : "По убыванию")">
+                <div Class="rounded-button-hover-scale">
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward"
+                                   OnClick="@ToggleSortDirection"
+                                   Style="@ArrowRotationStyle"
+                                   Variant="Variant.Text"/>
+                </div>
+            </MudTooltip>
+
+            <MudTooltip Text="Обновить">
+                <div Class="rounded-button-hover-scale">
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                                   OnClick="@OnRefreshClick"
+                                   Disabled="@_isRefreshing"
+                                   Style="@RefreshSpinStyle"
+                                   Variant="Variant.Text"/>
+                </div>
+            </MudTooltip>
+
+            <MudSpacer />
+
+            <MudChip T="string" Size="Size.Medium" Color="Color.Primary" Variant="Variant.Text">
+                @(_totalItems == 0 ? "Ничего не найдено" : $"Найдено: {_totalItems}")
+            </MudChip>
+        </MudStack>
+
+        @if (HasActiveFilters)
+        {
+            <MudStack Row="true" Spacing="1" Class="mt-3 flex-wrap align-center">
+                <MudText Typo="Typo.caption" Class="text-muted mr-1">Фильтры:</MudText>
+                @if (!string.IsNullOrWhiteSpace(_searchTerm))
+                {
+                    <MudChip T="string" Size="Size.Small" OnClose="@(() => OnSearchCleared())">
+                        "@_searchTerm"
+                    </MudChip>
+                }
+                @if (_selectedChips?.Any() == true)
+                {
+                    foreach (var chip in _selectedChips)
+                    {
+                        <MudChip T="string" Size="Size.Small" OnClose="@(() => RemoveChip(chip))">
+                            @chip
+                        </MudChip>
+                    }
+                }
+                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@ResetFilters">
+                    Сбросить всё
+                </MudButton>
+            </MudStack>
+        }
+    </MudPaper>
+
+    @if (_isLoading)
+    {
+        <MudGrid>
+            @for (int i = 0; i < _pageSize; i++)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudPaper Class="pa-4 rounded-lg" Style="height: 230px;">
+                        <MudSkeleton Width="70%" Height="28px" Class="mb-2" />
+                        <MudSkeleton Width="40%" Height="20px" Class="mb-4" />
+                        <MudSkeleton Width="100%" Height="16px" />
+                        <MudSkeleton Width="90%" Height="16px" Class="mb-3" />
+                        <MudSkeleton Width="50%" Height="16px" />
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else if (!_checklists.Any())
+    {
+        <MudPaper Class="pa-8 rounded-lg text-center" Elevation="0" Style="background: var(--mud-palette-background-grey);">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Class="mb-2 text-muted" />
+            <MudText Typo="Typo.h6" Class="mb-1">Чек-листы не найдены</MudText>
+            <MudText Typo="Typo.body2" Class="text-muted mb-3">
+                Попробуйте изменить поиск или фильтр по тегам
+            </MudText>
+            @if (HasActiveFilters)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@ResetFilters">
+                    Сбросить фильтры
+                </MudButton>
+            }
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var checklist in _checklists)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard Elevation="1" Class="checklist-card h-100 d-flex flex-column">
+                        <MudCardContent Class="flex-grow-1">
+                            <div class="d-flex align-start justify-space-between mb-2 gap-2">
+                                <div class="d-flex align-center gap-2" style="min-width: 0; width: 100%;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Checklist" Color="Color.Primary" Class="flex-shrink-0" />
+                                    <MudTooltip Text="@checklist.Title" Arrow="true" Placement="Placement.Top">
+                                        <MudText Typo="Typo.h6" Class="card-title mud-text-truncate" Style="width: 100%;">
+                                            @checklist.Title
+                                        </MudText>
+                                    </MudTooltip>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-1 mb-2 flex-wrap">
+                                @if (checklist.IsPopular)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.LocalFireDepartment">
+                                        Популярный
+                                    </MudChip>
+                                }
+                                @if (checklist.IsNew)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.AutoAwesome">
+                                        Новый
+                                    </MudChip>
+                                }
+                            </div>
+
+                            <MudText Typo="Typo.body2" Class="text-muted card-description mb-3">
+                                @checklist.Description
+                            </MudText>
+
+                            @if (checklist.Chips.Any())
+                            {
+                                <div class="d-flex flex-wrap gap-1 mb-2">
+                                    @foreach (var chip in checklist.Chips.Take(3))
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
+                                            @chip
+                                        </MudChip>
+                                    }
+                                    @if (checklist.Chips.Count > 3)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Text">
+                                            +@(checklist.Chips.Count - 3)
+                                        </MudChip>
+                                    }
+                                </div>
+                            }
+
+                            <div class="d-flex align-center gap-2 mb-1">
+                                <MudIcon Icon="@Icons.Material.Filled.ListAlt" Size="Size.Small" Class="text-muted" />
+                                <MudText Typo="Typo.caption" Class="text-muted">
+                                    @checklist.ItemsCount пунктов
+                                </MudText>
+                            </div>
+
+                            <div class="d-flex align-center gap-2 mb-1">
+                                <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Small" Class="text-muted" />
+                                <MudText Typo="Typo.caption" Class="text-muted">
+                                    Использован @checklist.UsageCount раз(а)
+                                </MudText>
+                            </div>
+
+                            <div class="d-flex align-center gap-2 mb-1">
+                                <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="text-muted" />
+                                <MudText Typo="Typo.caption" Class="text-muted">
+                                    @checklist.CreatedAtUtc.ToString("dd.MM.yyyy")
+                                </MudText>
+                            </div>
+                        </MudCardContent>
+
+                        <MudCardActions Class="border-top pa-2 gap-1">
+                            <MudButton StartIcon="@Icons.Material.Filled.Visibility"
+                                       Color="Color.Default"
+                                       Variant="Variant.Text"
+                                       Size="Size.Small"
+                                       OnClick="@(() => OpenPreviewDialog(checklist.Id))"
+                                       FullWidth>
+                                Пункты
+                            </MudButton>
+                            <MudButton StartIcon="@Icons.Material.Filled.PlayArrow"
+                                       Color="Color.Success"
+                                       Variant="Variant.Filled"
+                                       Size="Size.Small"
+                                       OnClick="@(() => StartChecklist(checklist.Id))"
+                                       FullWidth>
+                                Начать
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+
+        <div class="d-flex flex-column align-center mt-4 gap-2">
+            <MudPagination Selected="@_page"
+                           Count="@_totalPages"
+                           SelectedChanged="@OnPaginationChanged"
+                           Size="Size.Medium"
+                           Color="Color.Primary" />
+            <MudText Typo="Typo.caption" Class="text-muted">
+                Показано @Math.Min((_page - 1) * _pageSize + 1, _totalItems)–@Math.Min(_page * _pageSize, _totalItems) из @_totalItems
+            </MudText>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ChecklistDto> _checklists = new();
+    private int _totalItems;
+    private int _totalPages => Math.Max(1, (_totalItems + _pageSize - 1) / _pageSize);
+    private bool _isLoading;
+    private bool _isRefreshing;
+    private int MinSpinMs = 600;
+
+    private string _searchTerm = string.Empty;
+    private HashSet<string> _selectedChips = new();
+    private HashSet<string> _availableChips = new();
+    private string _sortField = "Title";
+    private bool _sortAscending = true;
+    private int _page = 1;
+    private readonly int _pageSize = 12;
+
+    private async Task OnRefreshClick()
+    {
+        if (_isRefreshing) return;
+        _isRefreshing = true;
+        StateHasChanged();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        await LoadData();
+        var remaining = MinSpinMs - (int)sw.ElapsedMilliseconds;
+        if (remaining > 0) await Task.Delay(remaining);
+        _isRefreshing = false;
+        StateHasChanged();
+    }
+
+    private string ArrowRotationStyle =>
+        $"transform: rotate({(_sortAscending ? 0 : 180)}deg); transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);";
+    private string RefreshSpinStyle =>
+        $"transform: rotate({(_isRefreshing ? 360 : 0)}deg); transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);";
+    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_searchTerm) || _selectedChips?.Any() == true;
+
+    private static readonly (string Field, string Label)[] SortOptions =
+    {
+        ("Title", "По названию"),
+        ("ItemsCount", "По количеству пунктов"),
+        ("UsageCount", "По использованию"),
+        ("CreatedAtUtc", "По дате")
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadChips();
+        await LoadData();
+    }
+
+    private async Task LoadChips()
+    {
+        var stats = await CatalogService.GetChipsStatsAsync();
+        _availableChips = new HashSet<string>(stats.Keys.OrderBy(k => k));
+    }
+
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            var selectedChipsParam = _selectedChips.Any() ? _selectedChips.ToList() : null;
+
+            var (items, total) = await CatalogService.GetChecklistsAsync(
+                _searchTerm,
+                selectedChipsParam,
+                _page,
+                _pageSize,
+                _sortField,
+                _sortAscending);
+
+            _checklists = items.ToList();
+            _totalItems = total;
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnSearchDebounced(string value) { _page = 1; await LoadData(); }
+    private async Task OnSearchKeyUp(KeyboardEventArgs e) { if (e.Key == "Enter") { _page = 1; await LoadData(); } }
+    private async Task OnSearchCleared() { _searchTerm = string.Empty; _page = 1; await LoadData(); }
+    private async Task RemoveChip(string chip) 
+    { 
+        _selectedChips.Remove(chip); 
+        _selectedChips = new HashSet<string>(_selectedChips); 
+        _page = 1; 
+        await LoadData(); 
+    }
+
+    private async Task OnChipsChanged(IEnumerable<string?> selectedValues)
+    {
+        _selectedChips = new HashSet<string>(selectedValues.Where(v => v is not null)!); 
+        _page = 1; 
+        await LoadData(); 
+    }
+    private async Task ResetFilters() 
+    { 
+        _searchTerm = string.Empty; 
+        _selectedChips = new HashSet<string>(); 
+        _page = 1; 
+        await LoadData(); 
+    }
+
+    private async Task OnPaginationChanged(int page) { _page = page; await LoadData(); }
+
+    private async void SetSort(string field)
+    {
+        if (_sortField == field) _sortAscending = !_sortAscending;
+        else { _sortField = field; _sortAscending = true; }
+        _page = 1;
+        await LoadData();
+    }
+
+    private async Task ToggleSortDirection() { _sortAscending = !_sortAscending; _page = 1; await LoadData(); }
+
+    private bool IsCurrentSort(string field) => _sortField == field;
+    private string GetDirectionIcon() => _sortAscending ? Icons.Material.Filled.ArrowUpward : Icons.Material.Filled.ArrowDownward;
+    private string GetSortLabel() => SortOptions.FirstOrDefault(x => x.Field == _sortField).Label ?? "Сортировка";
+
+    private void StartChecklist(Guid id)
+    {
+        // Здесь будет логика создания активного чек-листа (ActiveChecklist)
+        // и перенаправление на страницу прохождения.
+        NavigationManager.NavigateTo($"/checklists/start/{id}");
+    }
+
+    private async Task OpenPreviewDialog(Guid checklistId)
+    {
+        var checklist = await CatalogService.GetChecklistWithItemsAsync(checklistId);
+        if (checklist == null) return;
+
+        var parameters = new DialogParameters
+        {
+            ["Checklist"] = checklist
+        };
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+        DialogService.Show<PreviewChecklistDialog>("Пункты чек-листа", parameters, options);
+    }
+}

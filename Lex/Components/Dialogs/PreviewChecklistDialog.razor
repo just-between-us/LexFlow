@@ -1,0 +1,53 @@
+﻿@using Lex.Domain.Entities
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Checklist.Title</MudText>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">@Checklist.Description</MudText>
+    </TitleContent>
+    
+    <DialogContent>
+        @if (Checklist.Items?.Any() == true)
+        {
+            <MudList T="string" Gutters="false">
+                @foreach (var item in Checklist.Items.OrderBy(i => i.Order))
+                {
+                    <MudListItem Gutters="false">
+                        <MudStack Row="true" Spacing="3" Class="align-start">
+                            <MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Color="Color.Primary" Size="Size.Small" Class="mt-1" />
+                            <div style="width: 100%;">
+                                <MudText Typo="Typo.body1" Class="font-weight-medium">@item.Title</MudText>
+                                @if (!string.IsNullOrWhiteSpace(item.Description))
+                                {
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@item.Description</MudText>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(item.Content))
+                                {
+                                    <MudText Typo="Typo.body2" Class="mt-2" Style="background: var(--mud-palette-background-grey); padding: 12px; border-radius: 8px;">
+                                        @item.Content
+                                    </MudText>
+                                }
+                            </div>
+                        </MudStack>
+                    </MudListItem>
+                }
+            </MudList>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Color="Color.Error" Class="pa-4">Пунктов нет</MudText>
+        }
+    </DialogContent>
+    
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseDialog">Закрыть</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public Checklist Checklist { get; set; } = null!;
+
+    private void CloseDialog() => MudDialog.Cancel();
+}

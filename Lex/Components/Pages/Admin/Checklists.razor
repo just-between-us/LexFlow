@@ -1,0 +1,392 @@
+﻿@page "/admin/checklists"
+@attribute [Authorize(Roles = "Admin")]
+@using Lex.Application.DTOs
+@using Lex.Domain.Entities
+@using Lex.Infrastructure.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@rendermode InteractiveServer
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudText Typo="Typo.h3" Class="mb-2">Управление чек-листами</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+        Создание, редактирование и удаление шаблонов чек-листов
+    </MudText>
+
+    <MudPaper Class="pa-4 mb-6" Elevation="0">
+        <div class="d-flex align-center gap-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                       StartIcon="@Icons.Material.Filled.Add" 
+                       OnClick="@OpenCreateDialog" Class="rounded-lg">
+                Создать чек-лист
+            </MudButton>
+            <MudSpacer/>
+            <MudTextField @bind-Value="_searchQuery" Placeholder="Поиск по названию..." 
+                          Immediate="true" Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Class="search-field" T="string"/>
+        </div>
+    </MudPaper>
+
+    @if (_checklists == null)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-8"/>
+    }
+    else if (!_checklists.Any())
+    {
+        <MudPaper Class="pa-8 text-center" Elevation="0">
+            <MudIcon Icon="@Icons.Material.Filled.Checklist" Class="empty-icon mb-4"/>
+            <MudText Typo="Typo.h6">Нет чек-листов</MudText>
+            <MudText Color="Color.Secondary">Создайте первый шаблон чек-листа</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var checklist in FilteredChecklists)
+            {
+                <MudItem xs="12" sm="6" lg="4">
+                    <MudPaper Class="checklist-card pa-6" Elevation="0">
+                        <div class="d-flex justify-space-between align-start mb-3">
+                            <MudText Typo="Typo.h6" Class="flex-grow-1">@checklist.Title</MudText>
+                            <div class="d-flex gap-1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                               Size="Size.Small" Color="Color.Primary"
+                                               OnClick="@(() => OpenEditDialog(checklist))"/>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                               Size="Size.Small" Color="Color.Error"
+                                               OnClick="@(() => DeleteChecklist(checklist))"/>
+                            </div>
+                        </div>
+                        
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                            @(checklist.Description.Length > 120 
+                                ? checklist.Description[..120] + "..." 
+                                : checklist.Description)
+                        </MudText>
+                        
+                        @if (checklist.Chips.Any())
+                        {
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                @foreach (var chip in checklist.Chips.Select(cc => cc.Chip))
+                                {
+                                    <MudChip T="string" Size="Size.Small" 
+                                             Color="Color.Primary" Variant="Variant.Outlined">
+                                        @chip
+                                    </MudChip>
+                                }
+                            </div>
+                        }
+                        
+                        <div class="d-flex align-center gap-4">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                <MudIcon Icon="@Icons.Material.Filled.ListAlt" Size="Size.Small" Class="mr-1"/>
+                                @checklist.Items.Count пунктов
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1"/>
+                                @checklist.CreatedAtUtc.ToString("dd.MM.yyyy")
+                            </MudText>
+                        </div>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+<!-- Диалог создания/редактирования – остаётся без изменений, кроме модели EditModel -->
+<MudDialog @bind-Visible="_dialogVisible" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @(_editingChecklist == null ? "Создание чек-листа" : "Редактирование чек-листа")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudContainer Class="pa-0">
+            <MudTextField @bind-Value="_editModel.Title" Label="Название" 
+                          Required="true" T="string" Class="mb-4"/>
+            
+            <MudTextField @bind-Value="_editModel.Description" Label="Описание" 
+                          Lines="3" T="string" Class="mb-4"/>
+            
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Теги (Chips)</MudText>
+            <MudTextField @bind-Value="_newChip" Label="Добавить тег" 
+                          T="string" OnKeyDown="@OnChipKeyDown"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.Add"
+                          OnAdornmentClick="@AddChip" Class="mb-2"/>
+            
+            @if (_editModel.Chips.Any())
+            {
+                <div class="d-flex flex-wrap gap-2 mb-4">
+                    @foreach (var chip in _editModel.Chips)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" 
+                                 Variant="Variant.Outlined"
+                                 OnClose="@(() => RemoveChip(chip))">
+                            @chip
+                        </MudChip>
+                    }
+                </div>
+            }
+            
+            <MudDivider Class="my-4"/>
+            
+            <div class="d-flex align-center justify-space-between mb-3">
+                <MudText Typo="Typo.subtitle2">Пункты чек-листа</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="@AddItem">Добавить пункт</MudButton>
+            </div>
+            
+            @if (_editModel.Items.Any())
+            {
+                <MudList T="string" Class="items-list">
+                    @for (int i = 0; i < _editModel.Items.Count; i++)
+                    {
+                        var index = i;
+                        var item = _editModel.Items[i];
+                        <MudListItem T="string" Class="item-row">
+                            <div class="d-flex gap-3 align-center w-100">
+                                <MudText Typo="Typo.caption" Class="item-order">@(index + 1)</MudText>
+                                <MudTextField @bind-Value="_editModel.Items[index].Title" 
+                                              Label="Название пункта" T="string"
+                                              Class="flex-grow-1"/>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                               Size="Size.Small" Color="Color.Error"
+                                               OnClick="@(() => RemoveItem(index))"/>
+                            </div>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@CancelDialog" Color="Color.Secondary">Отмена</MudButton>
+        <MudButton OnClick="@SaveChecklist" Variant="Variant.Filled" Color="Color.Primary"
+                   Disabled="@(string.IsNullOrWhiteSpace(_editModel.Title) || _editModel.Items.Count == 0)">
+            Сохранить
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<Checklist>? _checklists;
+    private string _searchQuery = string.Empty;
+    private bool _dialogVisible;
+    private Checklist? _editingChecklist;
+    private EditModel _editModel = new();
+    private string _newChip = string.Empty;
+    
+    private readonly DialogOptions _dialogOptions = new() 
+    { 
+        MaxWidth = MaxWidth.Medium, 
+        FullWidth = true,
+        CloseButton = true,
+        CloseOnEscapeKey = true
+    };
+
+    // Фильтрация с учётом новой структуры Chips
+    private List<Checklist> FilteredChecklists => 
+        _checklists?.Where(c => 
+            string.IsNullOrWhiteSpace(_searchQuery) || 
+            c.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(c => c.UpdatedAtUtc ?? c.CreatedAtUtc)
+        .ToList() ?? new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadChecklists();
+    }
+
+    private async Task LoadChecklists()
+    {
+        // Создаём отдельный контекст для чтения
+        await using var context = await DbFactory.CreateDbContextAsync();
+        _checklists = await context.Checklists
+            .AsNoTracking()
+            .Include(c => c.Items)
+            .Include(c => c.Chips)   // подгружаем чипсы
+            .Where(c => !c.IsDeleted)
+            .ToListAsync();
+    }
+
+    private void OpenCreateDialog()
+    {
+        _editingChecklist = null;
+        _editModel = new EditModel();
+        _dialogVisible = true;
+    }
+
+    private void OpenEditDialog(Checklist checklist)
+    {
+        _editingChecklist = checklist;
+        _editModel = new EditModel
+        {
+            Title = checklist.Title,
+            Description = checklist.Description,
+            // Маппим List<ChecklistChip> в List<string>
+            Chips = checklist.Chips.Select(cc => cc.Chip).ToList(),
+            Items = checklist.Items.Select(i => new ItemModel
+            {
+                Title = i.Title,
+                Description = i.Description,
+                Content = i.Content,
+                Order = i.Order
+            }).ToList()
+        };
+        _dialogVisible = true;
+    }
+
+    private async Task SaveChecklist()
+    {
+        if (string.IsNullOrWhiteSpace(_editModel.Title) || _editModel.Items.Count == 0)
+            return;
+
+        // Создаём контекст для операции записи
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        if (_editingChecklist == null)
+        {
+            // Новый чек-лист
+            var checklist = new Checklist
+            {
+                Id = Guid.NewGuid(),
+                Title = _editModel.Title,
+                Description = _editModel.Description,
+                CreatedAtUtc = DateTime.UtcNow,
+                // Чипсы – создаём объекты ChecklistChip
+                Chips = _editModel.Chips.Select(chip => new ChecklistChip
+                {
+                    Id = Guid.NewGuid(),
+                    ChecklistId = Guid.NewGuid(), // временно, присвоим ниже
+                    Chip = chip
+                }).ToList(),
+                Items = _editModel.Items.Select((item, index) => new ChecklistItem
+                {
+                    Id = Guid.NewGuid(),
+                    Title = item.Title,
+                    Description = item.Description,
+                    Content = item.Content,
+                    Order = index + 1,
+                    CreatedAtUtc = DateTime.UtcNow
+                }).ToList()
+            };
+
+            // Проставляем ChecklistId для чипсов
+            foreach (var chip in checklist.Chips)
+                chip.ChecklistId = checklist.Id;
+
+            context.Checklists.Add(checklist);
+            Snackbar.Add("Чек-лист создан", Severity.Success);
+        }
+        else
+        {
+            // Редактирование существующего
+            // Загружаем с отслеживанием
+            var checklist = await context.Checklists
+                .Include(c => c.Items)
+                .Include(c => c.Chips)
+                .FirstAsync(c => c.Id == _editingChecklist.Id);
+
+            checklist.Title = _editModel.Title;
+            checklist.Description = _editModel.Description;
+            checklist.UpdatedAtUtc = DateTime.UtcNow;
+
+            // Обновляем чипсы: удаляем старые, добавляем новые
+            context.ChecklistChips.RemoveRange(checklist.Chips);
+            checklist.Chips = _editModel.Chips.Select(chip => new ChecklistChip
+            {
+                Id = Guid.NewGuid(),
+                ChecklistId = checklist.Id,
+                Chip = chip
+            }).ToList();
+
+            // Обновляем пункты: заменяем коллекцию
+            context.ChecklistItems.RemoveRange(checklist.Items);
+            checklist.Items = _editModel.Items.Select((item, index) => new ChecklistItem
+            {
+                Id = Guid.NewGuid(),
+                ChecklistId = checklist.Id,
+                Title = item.Title,
+                Description = item.Description,
+                Content = item.Content,
+                Order = index + 1,
+                CreatedAtUtc = DateTime.UtcNow
+            }).ToList();
+
+            Snackbar.Add("Чек-лист обновлён", Severity.Success);
+        }
+
+        await context.SaveChangesAsync();
+        _dialogVisible = false;
+        await LoadChecklists();
+    }
+
+    private async Task DeleteChecklist(Checklist checklist)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Подтверждение удаления",
+            $"Удалить чек-лист «{checklist.Title}»? Это действие нельзя отменить.",
+            yesText: "Удалить",
+            cancelText: "Отмена");
+        
+        if (result == true)
+        {
+            await using var context = await DbFactory.CreateDbContextAsync();
+            var entity = await context.Checklists.FindAsync(checklist.Id);
+            if (entity != null)
+            {
+                entity.IsDeleted = true;
+                entity.UpdatedAtUtc = DateTime.UtcNow;
+                await context.SaveChangesAsync();
+            }
+            await LoadChecklists();
+            Snackbar.Add("Чек-лист удалён", Severity.Warning);
+        }
+    }
+
+    private void CancelDialog()
+    {
+        _dialogVisible = false;
+        _editModel = new EditModel();
+    }
+
+    // --- Управление чипсами в EditModel (List<string>) ---
+    private void AddChip()
+    {
+        if (!string.IsNullOrWhiteSpace(_newChip) && !_editModel.Chips.Contains(_newChip))
+        {
+            _editModel.Chips.Add(_newChip.Trim());
+            _newChip = string.Empty;
+        }
+    }
+
+    private async Task OnChipKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            AddChip();
+        }
+    }
+
+    private void RemoveChip(string chip)
+    {
+        _editModel.Chips.Remove(chip);
+    }
+
+    private void AddItem()
+    {
+        _editModel.Items.Add(new ItemModel { Order = _editModel.Items.Count + 1 });
+    }
+
+    private void RemoveItem(int index)
+    {
+        _editModel.Items.RemoveAt(index);
+    }
+}
