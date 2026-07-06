@@ -34,3 +34,7 @@ logs/
 ## Publish
 *.nupkg
 /publish/
+
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
