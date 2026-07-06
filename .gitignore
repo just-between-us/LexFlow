@@ -1,0 +1,36 @@
+## Visual Studio / Rider
+## Build results
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+
+## IDE
+.idea/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+*.DotSettings
+
+## SQLite databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+## ASP.NET Core
+appsettings.Development.json
+appsettings.Production.json
+
+## Logs
+logs/
+*.log
+*.log.*
+
+## Publish
+*.nupkg
+/publish/
