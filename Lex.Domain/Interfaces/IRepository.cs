@@ -6,8 +6,7 @@ namespace Lex.Domain.Interfaces;
 public interface IRepository<T> where T : BaseEntity
 {
     Task<T?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<T>> GetAllAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<T>> GetPagedAsync(int pageNumber, int pageSize, 
+    Task<IReadOnlyList<T>> GetAllAsync(CancellationToken cancellationToken = default); Task<IReadOnlyList<T>> GetPagedAsync(int pageNumber, int pageSize, 
         Expression<Func<T, bool>>? predicate = null, 
         Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null,
         CancellationToken cancellationToken = default);

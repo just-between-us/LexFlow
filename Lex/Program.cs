@@ -55,13 +55,19 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddHttpContextAccessor();
 
+//Репы
+builder.Services.AddScoped<DocumentTemplateRepository>();
+builder.Services.AddScoped<ChecklistRepository>();
+builder.Services.AddScoped<DocumentRepository>();
+builder.Services.AddScoped<DocumentVersionRepository>();
+
+//Сервисы
+builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IChecklistCatalogService, ChecklistCatalogService>();
+builder.Services.AddScoped<ITemplateCatalogService, TemplateCatalogService>();
+//Auth
 builder.Services.AddScoped<IdentityService>();
 builder.Services.AddScoped<AuthenticationStateProvider, PersistentAuthenticationStateProvider>();
-
-builder.Services.AddScoped<ITemplateCatalogService, TemplateCatalogService>();
-builder.Services.AddScoped<DocumentTemplateRepository>();
-builder.Services.AddScoped<IChecklistCatalogService, ChecklistCatalogService>();
-builder.Services.AddScoped<ChecklistRepository>();
 
 builder.Services.AddScoped<UserContext>();
 builder.Services.AddScoped<PersistentAuthenticationStateProvider>();
