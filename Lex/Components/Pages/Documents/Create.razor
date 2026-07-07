@@ -1,0 +1,224 @@
+﻿@page "/documents/create"
+@attribute [Authorize]
+@using Lex.Domain.Entities
+@using Lex.Domain.Enums
+@using Lex.Components.Auth
+@using Lex.Domain.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@inject IDocumentService DocumentService
+@inject UserContext UserContext
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    @if (_isInitializing)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (_currentUserId == null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            Ошибка авторизации. Пожалуйста, войдите в систему.
+        </MudAlert>
+    }
+    else
+    {
+        <MudText Typo="Typo.h4" Class="mb-4">Создание документа на основе шаблона</MudText>
+
+        <EditForm Model="@_document" OnValidSubmit="SaveDocumentAsync">
+            <DataAnnotationsValidator />
+            <MudCard Elevation="1" Class="mb-4">
+                <MudCardContent>
+                    <MudTextField @bind-Value="_document.Title"
+                                  Label="Название документа"
+                                  Required="true"
+                                  For="@(() => _document.Title)"
+                                  T="string" Class="mb-3" />
+
+                    <MudTextField @bind-Value="_document.Description"
+                                  Label="Описание"
+                                  Lines="2"
+                                  T="string" Class="mb-3" />
+
+                    <MudSelect @bind-Value="_document.Type"
+                               Label="Тип документа"
+                               T="DocumentType" Class="mb-3">
+                        @foreach (DocumentType type in Enum.GetValues(typeof(DocumentType)))
+                        {
+                            <MudSelectItem T="DocumentType" Value="type">
+                                @GetTypeDisplayName(type)
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudTextField @bind-Value="_document.CurrentContent"
+                                  Label="Содержимое (Markdown)"
+                                  Lines="15"
+                                  T="string" Class="mb-3" />
+
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Статус: @GetStatusDisplayName(_document.Status)
+                    </MudText>
+                </MudCardContent>
+
+                <MudCardActions>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               ButtonType="ButtonType.Submit"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               Disabled="@_isSaving">
+                        @(_isSaving ? "Сохранение..." : "Сохранить документ")
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Secondary"
+                               OnClick="ExportPlaceholder"
+                               StartIcon="@Icons.Material.Filled.FileDownload">
+                        Экспорт (в разработке)
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Text"
+                               OnClick="Cancel">
+                        Отмена
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </EditForm>
+    }
+</MudContainer>
+
+@code {
+    [SupplyParameterFromQuery(Name = "templateId")]
+    public Guid? TemplateId { get; set; }
+
+    private Document _document = new();
+    private bool _isInitializing = true;
+    private bool _isSaving;
+    private Guid? _currentUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentUserId = Guid.TryParse(UserContext.CurrentUser?.UserId, out var userId) ? userId : null;
+        
+        if (_currentUserId == null || !UserContext.IsAuthenticated)
+        {
+            Snackbar.Add("Для создания документа необходимо авторизоваться", Severity.Error);
+            _isInitializing = false;
+            return;
+        }
+
+        if (!TemplateId.HasValue)
+        {
+            Snackbar.Add("Не указан шаблон для создания документа", Severity.Warning);
+            Navigation.NavigateTo("/templates");
+            return;
+        }
+
+        try
+        {
+            var templateModel = await DocumentService.GetTemplateForEditingAsync(TemplateId.Value);
+            if (templateModel != null)
+            {
+                _document = new Document
+                {
+                    Title = templateModel.Title,
+                    Description = templateModel.Description,
+                    Type = templateModel.Type,
+                    CurrentContent = templateModel.CurrentContent,
+                    TemplateId = templateModel.Id,
+                    Status = DocumentStatus.Draft,
+                    Privacy = DocumentPrivacy.Private,
+                    CreatedByUserId = _currentUserId.Value
+                };
+            }
+            else
+            {
+                Snackbar.Add("Шаблон не найден", Severity.Warning);
+                Navigation.NavigateTo("/templates");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка загрузки шаблона: {ex.Message}", Severity.Error);
+            Navigation.NavigateTo("/templates");
+        }
+        finally
+        {
+            _isInitializing = false;
+        }
+    }
+
+    private async Task SaveDocumentAsync()
+    {
+        if (_currentUserId == null)
+        {
+            Snackbar.Add("Ошибка авторизации", Severity.Error);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_document.Title))
+        {
+            Snackbar.Add("Название документа обязательно", Severity.Warning);
+            return;
+        }
+
+        _isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            if (!TemplateId.HasValue)
+            {
+                Snackbar.Add("Не указан шаблон", Severity.Error);
+                return;
+            }
+
+            await DocumentService.CreateDocumentFromTemplateAsync(
+                TemplateId.Value,
+                _currentUserId.Value);
+
+            Snackbar.Add("Документ успешно создан", Severity.Success);
+            await Task.Delay(600);
+            Navigation.NavigateTo("/documents/my");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка при сохранении: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ExportPlaceholder()
+    {
+        Snackbar.Add("Функция экспорта будет реализована позже", Severity.Info);
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo(TemplateId.HasValue ? $"/templates/view/{TemplateId}" : "/templates");
+    }
+
+    private static string GetTypeDisplayName(DocumentType type) => type switch
+    {
+        DocumentType.Contract => "Договор",
+        DocumentType.Claim => "Иск",
+        DocumentType.Policy => "Политика",
+        DocumentType.Agreement => "Соглашение",
+        DocumentType.Consent => "Согласие",
+        _ => "Прочее"
+    };
+
+    private static string GetStatusDisplayName(DocumentStatus status) => status switch
+    {
+        DocumentStatus.Draft => "Черновик",
+        DocumentStatus.InReview => "На проверке",
+        DocumentStatus.Ready => "Готов",
+        DocumentStatus.Signed => "Подписан",
+        DocumentStatus.Archived => "Архив",
+        _ => "Неизвестно"
+    };
+}

@@ -1,0 +1,91 @@
+﻿@page "/templates/view/{id:guid}"
+@using Lex.Domain.Entities
+@using Lex.Domain.Enums
+@using Lex.Infrastructure.Repositories
+@inject DocumentTemplateRepository TemplateRepo
+@inject NavigationManager Navigation
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    @if (_template == null)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-8" />
+    }
+    else
+    {
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="GoBack" Class="mb-4">
+            Назад к каталогу
+        </MudButton>
+
+        <MudText Typo="Typo.h4" Class="mb-2">@_template.Title</MudText>
+        <MudText Typo="Typo.subtitle1" Color="Color.Secondary" Class="mb-2">
+            @_template.Description
+        </MudText>
+
+        <MudChip T="string" Color="Color.Info" Variant="Variant.Text" Class="mb-4">
+            @GetTypeDisplayName(_template.Type)
+        </MudChip>
+
+        <MudPaper Elevation="1" Class="pa-4 mb-4" Style="max-height: 400px; overflow-y: auto;">
+            <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@_template.CurrentContent</MudText>
+        </MudPaper>
+
+        @if (_template.Hints?.Any() == true)
+        {
+            <MudText Typo="Typo.h6" Class="mb-2">Советы по заполнению</MudText>
+            <MudList T="string">
+                @foreach (var hint in _template.Hints.OrderBy(h => h.Order))
+                {
+                    <MudListItem T="string">
+                        <MudAlert Severity="@GetHintSeverity(hint.Importance)" Class="w-100">
+                            @hint.Text
+                        </MudAlert>
+                    </MudListItem>
+                }
+            </MudList>
+        }
+
+        <div class="d-flex gap-2 mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Href="@($"/documents/create?templateId={_template.Id}")">
+                Использовать шаблон
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="GoBack">
+                Назад
+            </MudButton>
+        </div>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private DocumentTemplate? _template;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _template = await TemplateRepo.GetTemplateWithHintsAsync(Id);
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/templates");
+
+    private static string GetTypeDisplayName(DocumentType type) => type switch
+    {
+        DocumentType.Contract => "Договор",
+        DocumentType.Claim => "Иск",
+        DocumentType.Policy => "Политика",
+        DocumentType.Agreement => "Соглашение",
+        DocumentType.Consent => "Согласие",
+        _ => "Прочее"
+    };
+
+    private static Severity GetHintSeverity(HintImportance importance) => importance switch
+    {
+        HintImportance.Info => Severity.Info,
+        HintImportance.Warning => Severity.Warning,
+        HintImportance.Critical => Severity.Error,
+        _ => Severity.Normal
+    };
+}
