@@ -1,4 +1,5 @@
 ﻿using Lex.Application.DTOs;
+using Lex.Domain.DTOs;
 
 namespace Lex.Components.Auth;
 

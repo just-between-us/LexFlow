@@ -1,4 +1,4 @@
-﻿namespace Lex.Application.DTOs;
+﻿namespace Lex.Domain.DTOs;
 
 public class UserInfo
 {
