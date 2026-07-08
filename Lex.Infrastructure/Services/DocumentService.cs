@@ -101,4 +101,58 @@ public class DocumentService : IDocumentService
 
         return document;
     }
+    public async Task<Document> CreateDocumentFromTemplateAsync(
+        Guid templateId,
+        Guid userId,
+        DocumentPrivacy privacy,
+        bool archiveImmediately = false,
+        CancellationToken cancellationToken = default)
+    {
+        var template = await _templateRepo.GetTemplateWithHintsAsync(templateId, cancellationToken);
+        if (template == null)
+            throw new KeyNotFoundException($"Шаблон с ID {templateId} не найден");
+
+        var document = new Document
+        {
+            Id = Guid.NewGuid(),
+            Title = template.Title,
+            Description = template.Description,
+            Type = template.Type,
+            CurrentContent = template.CurrentContent,
+            TemplateId = template.Id,
+            Status = archiveImmediately ? DocumentStatus.Archived : DocumentStatus.Draft,
+            Privacy = privacy,
+            CreatedByUserId = userId,
+            CreatedAtUtc = DateTime.UtcNow,
+            ArchivedAtUtc = archiveImmediately ? DateTime.UtcNow : null
+        };
+
+        var firstVersion = new DocumentVersion
+        {
+            Id = Guid.NewGuid(),
+            DocumentId = document.Id,
+            VersionNumber = 1,
+            Content = document.CurrentContent,
+            ChangeSummary = archiveImmediately 
+                ? "Первоначальная версия (создана из шаблона, сразу помещена в архив)" 
+                : "Первоначальная версия (создана из шаблона)",
+            VersionCreatedByUserId = userId,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await _documentRepo.AddAsync(document, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await _versionRepo.CreateVersionAsync(firstVersion, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+        return document;
+    }
 }

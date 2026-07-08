@@ -27,6 +27,40 @@ public class DocumentRepository : Repository<Document>
                 .ThenInclude(v => v.VersionCreatedByUser)
             .FirstOrDefaultAsync(cancellationToken);
     }
+    
+    public async Task<(IReadOnlyList<Document> Items, int TotalCount)> SearchDocumentsPagedAsync(
+        Guid? userId = null,
+        string? searchTerm = null,
+        DocumentStatus? status = null,
+        DocumentPrivacy? privacy = null,
+        int pageNumber = 1,
+        int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbSet.AsNoTracking().Where(d => !d.IsDeleted);
+
+        if (userId.HasValue)
+            query = query.Where(d => d.CreatedByUserId == userId.Value);
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var term = searchTerm.ToLower();
+            query = query.Where(d => d.Title.ToLower().Contains(term) || d.Description.ToLower().Contains(term));
+        }
+        if (status.HasValue)
+            query = query.Where(d => d.Status == status.Value);
+        if (privacy.HasValue)
+            query = query.Where(d => d.Privacy == privacy.Value);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(d => d.UpdatedAtUtc ?? d.CreatedAtUtc)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
+    }
 
     /// Получить документы пользователя
     public virtual async Task<IReadOnlyList<Document>> GetUserDocumentsAsync(

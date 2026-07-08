@@ -1,6 +1,7 @@
 using MudBlazor.Services;
 using Lex.Components;
 using Lex.Components.Auth;
+using Lex.Components.Utils;
 using Lex.Domain.Entities;
 using Lex.Domain.Interfaces;
 using Lex.Infrastructure.Data;
@@ -65,6 +66,10 @@ builder.Services.AddScoped<DocumentVersionRepository>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IChecklistCatalogService, ChecklistCatalogService>();
 builder.Services.AddScoped<ITemplateCatalogService, TemplateCatalogService>();
+
+//Утилитарный сервис для получения имени из enum
+builder.Services.AddScoped<IDocumentHelperService, DocumentHelperService>();
+
 //Auth
 builder.Services.AddScoped<IdentityService>();
 builder.Services.AddScoped<AuthenticationStateProvider, PersistentAuthenticationStateProvider>();

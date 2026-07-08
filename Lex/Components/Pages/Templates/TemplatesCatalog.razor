@@ -4,8 +4,9 @@
 @using Lex.Domain.Interfaces
 @inject ITemplateCatalogService CatalogService
 @inject NavigationManager NavigationManager
-
-<PageTitle>Каталог шаблонов</PageTitle>
+<div class="py-4">
+    <PageTitle>Каталог шаблонов</PageTitle>
+</div>
 <div class="templates-page">
     <div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
         <div>
@@ -297,7 +298,7 @@
         "transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);";
 
     private string RefreshSpinStyle =>
-        $"transform: rotate({(_isRefreshing ? 360 : 0)}deg); " +
+        $"transform: rotate({(_isRefreshing ? 360 : 0)}deg);" +
         "transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);";
     
     private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_searchTerm) || _selectedType.HasValue;
