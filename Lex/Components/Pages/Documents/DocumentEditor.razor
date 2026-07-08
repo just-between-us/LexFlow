@@ -1,0 +1,402 @@
+﻿@page "/documents/{id:guid}"
+@attribute [Authorize]
+@using Lex.Domain.Entities
+@using Lex.Domain.Enums
+@using Lex.Infrastructure.Repositories
+@using Lex.Components.Auth
+@using Lex.Components.Utils
+@using Microsoft.AspNetCore.Authorization
+@using Markdig
+@inject DocumentRepository DocumentRepo
+@inject UserContext UserContext
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IDocumentHelperService DocumentHelper
+@*@inject IJSRuntime JS*@
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-8">
+    @if (_isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-8" />
+    }
+    else if (_document == null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            Документ не найден или доступ запрещён.
+        </MudAlert>
+    }
+    else
+    {
+        <!-- Заголовок и основные действия -->
+        <div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
+            <div>
+                <MudText Typo="Typo.h4">@_document.Title</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    @DocumentHelper.GetStatusDisplayName(_document.Status) · @DocumentHelper.GetTypeDisplayName(_document.Type) · v.@_selectedVersion?.VersionNumber
+                </MudText>
+            </div>
+            <div class="d-flex gap-2">
+                @if (_canEdit)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Edit"
+                               OnClick="@(() => _editMode = true)">
+                        Редактировать
+                    </MudButton>
+                }
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.Share"
+                           OnClick="@OpenShareDialog">
+                    Поделиться
+                </MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.ArrowBack"
+                           OnClick="@GoBack">
+                    Назад
+                </MudButton>
+            </div>
+        </div>
+
+        <!-- Основная область: просмотр/редактирование и сайдбар с версиями -->
+        <MudGrid>
+            <!-- Левая часть: контент документа -->
+            <MudItem xs="12" md="8">
+                @if (_editMode)
+                {
+                    <!-- Режим редактирования -->
+                    <EditForm Model="@_editModel" OnValidSubmit="SaveChanges">
+                        <DataAnnotationsValidator />
+                        <MudCard Elevation="1" Class="mb-4">
+                            <MudCardContent>
+                                <MudTextField @bind-Value="_editModel.Title" Label="Название"
+                                              Required="true" For="@(() => _editModel.Title)"
+                                              T="string" Class="mb-3" />
+                                <MudTextField @bind-Value="_editModel.Description" Label="Описание"
+                                              Lines="2" T="string" Class="mb-3" />
+                                <MudSelect @bind-Value="_editModel.Type" Label="Тип" T="DocumentType" Class="mb-3">
+                                    @foreach (var type in Enum.GetValues<DocumentType>())
+                                    {
+                                        <MudSelectItem T="DocumentType" Value="type">@DocumentHelper.GetTypeDisplayName(type)</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <MudSelect @bind-Value="_editModel.Privacy" Label="Видимость" T="DocumentPrivacy" Class="mb-3">
+                                    @foreach (var p in Enum.GetValues<DocumentPrivacy>())
+                                    {
+                                        <MudSelectItem T="DocumentPrivacy" Value="p">@DocumentHelper.GetPrivacyDisplayName(p)</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <MudTextField @bind-Value="_editModel.CurrentContent" Label="Содержимое (Markdown)"
+                                              Lines="15" T="string" Immediate="true"
+                                              OnKeyUp="UpdatePreview" Class="mb-3" />
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                           ButtonType="ButtonType.Submit"
+                                           StartIcon="@Icons.Material.Filled.Save"
+                                           Disabled="@_isSaving">
+                                    @(_isSaving ? "Сохранение..." : "Сохранить как новую версию")
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                                           OnClick="@CancelEdit">
+                                    Отмена
+                                </MudButton>
+                            </MudCardActions>
+                        </MudCard>
+                    </EditForm>
+                }
+                else
+                {
+                    <!-- Режим просмотра с рендерингом Markdown -->
+                    <MudCard Elevation="1" Class="mb-4 h-100">
+                        <MudCardContent Class="markdown-preview">
+                            @if (string.IsNullOrWhiteSpace(_selectedVersion?.Content))
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Нет содержимого</MudText>
+                            }
+                            else
+                            {
+                                @((MarkupString)RenderMarkdown(_selectedVersion.Content))
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudItem>
+
+            <!-- Правая часть: история версий -->
+            <MudItem xs="12" md="4">
+                <MudPaper Class="pa-3" Elevation="0">
+                    <div class="d-flex align-center justify-space-between mb-3">
+                        <MudText Typo="Typo.h6">История версий</MudText>
+                        <MudTooltip Text="Текущая версия">
+                            <MudIcon Icon="@Icons.Material.Filled.History" />
+                        </MudTooltip>
+                    </div>
+                    <MudList T="DocumentVersion" Class="version-list">
+                        @foreach (var version in _versions)
+                        {
+                            <MudListItem T="DocumentVersion"
+                                         Text="@($"v{version.VersionNumber} – {version.VersionCreatedByUser?.FirstName ?? "Неизвестный"}")"
+                                         SecondaryText="@version.CreatedAtUtc.ToString("g")"
+                                         Icon="@(version == _selectedVersion ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Circle)"
+                                         OnClick="@(() => SelectVersion(version))"
+                                         Class="@(version == _selectedVersion ? "active-version" : "")" />
+                        }
+                    </MudList>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+<!-- Диалог "Поделиться" -->
+<MudDialog @bind-Visible="_shareDialogVisible" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Поделиться документом</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex flex-column gap-3">
+            <MudTextField T="string" Label="Ссылка на документ"
+                          Value="@_documentLink" ReadOnly="true"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.ContentCopy"
+                          OnAdornmentClick="@CopyDocumentLink" />
+            <MudTextField T="string" Label="Ссылка для приглашения редактора"
+                          Value="@_editorInviteLink" ReadOnly="true"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.ContentCopy"
+                          OnAdornmentClick="@CopyEditorInviteLink" />
+
+            <MudDivider />
+            <MudText Typo="Typo.subtitle2">Редакторы (@_editors.Count)</MudText>
+            <MudList T="User" Class="editors-list">
+                @foreach (var editor in _editors)
+                {
+                    <MudListItem T="User" Class="editor-item">
+                        <div class="d-flex align-center w-100">
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" />
+                            <MudText>@editor.FirstName</MudText>
+                            <MudSpacer />
+                            <MudTooltip Text="Удалить доступ">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="@(() => RemoveEditor(editor.Id))" />
+                            </MudTooltip>
+                        </div>
+                    </MudListItem>
+                }
+            </MudList>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@CloseShareDialog">Закрыть</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Document? _document;
+    private DocumentVersion? _selectedVersion;
+    private List<DocumentVersion> _versions = new();
+    private List<User> _editors = new();
+    private bool _isLoading = true;
+    private bool _editMode = false;
+    private bool _isSaving = false;
+    private bool _canEdit = false;
+
+    // Модель редактирования
+    private EditModel _editModel = new();
+
+    // Текущий пользователь
+    private Guid? _currentUserId;
+    private bool _isAuthorized;
+
+    // Диалог "Поделиться"
+    private bool _shareDialogVisible = false;
+    private string _documentLink => Navigation.ToAbsoluteUri($"/documents/{Id}").ToString();
+    private string _editorInviteLink => Navigation.ToAbsoluteUri($"/documents/{Id}?invite=editor").ToString();
+    private DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+
+    private void UpdatePreview(KeyboardEventArgs e) => StateHasChanged();
+    
+    protected override async Task OnInitializedAsync()
+    {
+        _currentUserId = Guid.TryParse(UserContext.CurrentUser?.UserId, out var uid) ? uid : null;
+        _isAuthorized = _currentUserId.HasValue;
+        if (_isAuthorized)
+            await LoadDocument();
+        else
+            _isLoading = false;
+    }
+
+    private async Task LoadDocument()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            _document = await DocumentRepo.GetDocumentWithDetailsAsync(Id);
+            if (_document == null || _document.IsDeleted)
+            {
+                _document = null;
+                return;
+            }
+
+            _canEdit = _document.CreatedByUserId == _currentUserId ||
+                       _document.Editors.Any(e => e.Id == _currentUserId);
+
+            _versions = _document.Versions
+                .OrderByDescending(v => v.VersionNumber)
+                .ToList();
+            _selectedVersion = _versions.FirstOrDefault(v => v.VersionNumber == _document.CurrentVersionNumber);
+            _editors = _document.Editors.ToList();
+
+            // Инициализация модели редактирования
+            _editModel = new EditModel
+            {
+                Title = _document.Title,
+                Description = _document.Description,
+                Type = _document.Type,
+                Privacy = _document.Privacy,
+                CurrentContent = _selectedVersion?.Content ?? _document.CurrentContent
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка загрузки документа: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void SelectVersion(DocumentVersion version)
+    {
+        _selectedVersion = version;
+        StateHasChanged();
+    }
+
+    private async Task SaveChanges()
+    {
+        if (string.IsNullOrWhiteSpace(_editModel.Title))
+        {
+            Snackbar.Add("Название обязательно", Severity.Warning);
+            return;
+        }
+
+        _isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            // Обновляем основные поля документа
+            _document!.Title = _editModel.Title;
+            _document.Description = _editModel.Description;
+            _document.Type = _editModel.Type;
+            _document.Privacy = _editModel.Privacy;
+            _document.UpdatedAtUtc = DateTime.UtcNow;
+
+            // Создаем новую версию с новым контентом
+            var newVersion = new DocumentVersion
+            {
+                Id = Guid.NewGuid(),
+                DocumentId = _document.Id,
+                VersionNumber = _document.CurrentVersionNumber + 1,
+                Content = _editModel.CurrentContent,
+                ChangeSummary = "Обновление документа",
+                VersionCreatedByUserId = _currentUserId,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            // Используем репозиторий для сохранения (транзакционно)
+            await DocumentRepo.UpdateAsync(_document);
+            await DocumentRepo.AddDocumentVersionAsync(newVersion);
+
+            // Обновляем текущее состояние
+            _document = await DocumentRepo.GetDocumentWithDetailsAsync(Id);
+            _versions = _document!.Versions.OrderByDescending(v => v.VersionNumber).ToList();
+            _selectedVersion = _versions.FirstOrDefault(v => v.VersionNumber == _document.CurrentVersionNumber);
+            _editMode = false;
+
+            Snackbar.Add("Документ обновлён. Создана версия " + newVersion.VersionNumber, Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка при сохранении: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CancelEdit()
+    {
+        _editMode = false;
+        // Сбросить модель к текущей версии
+        _editModel = new EditModel
+        {
+            Title = _document!.Title,
+            Description = _document.Description,
+            Type = _document.Type,
+            Privacy = _document.Privacy,
+            CurrentContent = _selectedVersion?.Content ?? _document.CurrentContent
+        };
+    }
+
+    private void OpenShareDialog() => _shareDialogVisible = true;
+    private void CloseShareDialog() => _shareDialogVisible = false;
+
+    private async Task CopyDocumentLink()
+    {
+        /*await JS.InvokeVoidAsync("clipboardCopy.copyText", _documentLink);*/
+        Snackbar.Add("Ссылка скопирована", Severity.Info);
+    }
+
+    private async Task CopyEditorInviteLink()
+    {
+        /*await JS.InvokeVoidAsync("clipboardCopy.copyText", _editorInviteLink);*/
+        Snackbar.Add("Ссылка для редактора скопирована", Severity.Info);
+    }
+
+    private async Task RemoveEditor(Guid editorId)
+    {
+        if (_document == null || _currentUserId == null) return;
+        var editor = _document.Editors.FirstOrDefault(e => e.Id == editorId);
+        if (editor == null) return;
+
+        try
+        {
+            await DocumentRepo.RemoveEditorFromDocumentAsync(_document.Id, editorId);
+            _editors.Remove(editor);
+            _document.Editors.Remove(editor);
+            Snackbar.Add($"Доступ редактора {editor.FirstName} удалён", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/documents/my");
+
+    private static string RenderMarkdown(string markdown)
+    {
+        var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+        return Markdown.ToHtml(markdown ?? string.Empty, pipeline);
+    }
+
+    private class EditModel
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public DocumentType Type { get; set; }
+        public DocumentPrivacy Privacy { get; set; }
+        public string CurrentContent { get; set; } = string.Empty;
+    }
+}

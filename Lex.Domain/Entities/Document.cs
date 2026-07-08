@@ -3,9 +3,8 @@ using Lex.Domain.Enums;
 
 namespace Lex.Domain.Entities;
 
-public class Document : BaseEntity  // больше не наследует DocumentTemplate
+public class Document : BaseEntity  
 {
-    // Поля, ранее наследовавшиеся от DocumentTemplate
     [Required, MaxLength(200)]
     public string Title { get; set; } = string.Empty;
 
