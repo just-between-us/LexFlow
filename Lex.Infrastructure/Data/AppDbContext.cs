@@ -48,24 +48,34 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         // Document
         builder.Entity<Document>(entity =>
         {
+            entity.ToTable("Documents"); // явно указываем таблицу, если нужно
+            entity.HasKey(d => d.Id);
+            
+            entity.Property(d => d.Title).HasMaxLength(200).IsRequired();
+            entity.Property(d => d.Description).HasMaxLength(2000).IsRequired();
+            entity.Property(d => d.CurrentContent).HasMaxLength(150000).IsRequired();
+            entity.Property(d => d.Type).IsRequired();
+            
             entity.HasOne(d => d.CreatedByUser)
-                  .WithMany(u => u.CreatedDocuments)
-                  .HasForeignKey(d => d.CreatedByUserId)
-                  .OnDelete(DeleteBehavior.Restrict);
+                .WithMany(u => u.CreatedDocuments)
+                .HasForeignKey(d => d.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasMany(d => d.Editors)
-                  .WithMany(u => u.EditableDocuments)
-                  .UsingEntity(j => j.ToTable("DocumentEditors"));
+                .WithMany(u => u.EditableDocuments)
+                .UsingEntity(j => j.ToTable("DocumentEditors"));
 
             entity.HasOne(d => d.Template)
-                  .WithMany()
-                  .HasForeignKey(d => d.TemplateId)
-                  .OnDelete(DeleteBehavior.Restrict);
+                .WithMany()
+                .HasForeignKey(d => d.TemplateId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(d => d.ClientOrganization)
-                  .WithMany(o => o.Documents)
-                  .HasForeignKey(d => d.ClientOrganizationId)
-                  .OnDelete(DeleteBehavior.SetNull);
+                .WithMany(o => o.Documents)
+                .HasForeignKey(d => d.ClientOrganizationId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasQueryFilter(d => !d.IsDeleted);
         });
 
         // DocumentVersion
@@ -156,8 +166,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasQueryFilter(i => !i.IsDeleted);
         });
 
-        // Наследование Document : DocumentTemplate (TPT)
-        builder.Entity<DocumentTemplate>().UseTptMappingStrategy();
+        /*// Наследование Document : DocumentTemplate (TPT)
+        builder.Entity<DocumentTemplate>().UseTptMappingStrategy();*/
 
         // TemplateHint
         builder.Entity<TemplateHint>(entity =>
