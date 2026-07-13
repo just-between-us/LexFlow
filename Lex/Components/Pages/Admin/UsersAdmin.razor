@@ -1,0 +1,247 @@
+﻿@page "/admin/users"
+@attribute [Authorize(Roles = "Admin")]
+@using Lex.Domain.DTOs
+@using Lex.Domain.Entities
+@using Lex.Infrastructure.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject UserManager<User> UserManager
+@inject AppDbContext DbContext
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Управление пользователями</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-8">
+    <MudText Typo="Typo.h3" Class="mb-2">Пользователи системы</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+        Управление учётными записями, активностью и ролями пользователей
+    </MudText>
+
+    <MudPaper Class="pa-4 mb-6" Elevation="0">
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="4">
+                <MudTextField @bind-Value="_searchTerm" 
+                              Placeholder="Поиск по email, имени..."
+                              Immediate="true"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              T="string"
+                              OnKeyUp="OnSearchEnter"/>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect @bind-Value="_filterActive" Label="Статус" T="bool?" Variant="Variant.Outlined">
+                    <MudSelectItem T="bool?" Value="@((bool?)null)">Все</MudSelectItem>
+                    <MudSelectItem T="bool?" Value="@((bool?)true)">Активные</MudSelectItem>
+                    <MudSelectItem T="bool?" Value="@((bool?)false)">Неактивные</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect @bind-Value="_filterLocked" Label="Блокировка" T="bool?" Variant="Variant.Outlined">
+                    <MudSelectItem T="bool?" Value="@((bool?)null)">Все</MudSelectItem>
+                    <MudSelectItem T="bool?" Value="@((bool?)true)">Заблокированные</MudSelectItem>
+                    <MudSelectItem T="bool?" Value="@((bool?)false)">Не заблокированные</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadUsers" FullWidth>
+                    Применить
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (_users == null)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-8" />
+    }
+    else if (!_users.Any())
+    {
+        <MudPaper Class="pa-8 text-center" Elevation="0">
+            <MudIcon Icon="@Icons.Material.Filled.PeopleOutline" Class="mb-4" Style="font-size:64px;color:var(--mud-palette-text-disabled)"/>
+            <MudText Typo="Typo.h6">Пользователи не найдены</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudTable Items="_users" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="1">
+            <HeaderContent>
+                <MudTh>Пользователь</MudTh>
+                <MudTh>Email</MudTh>
+                <MudTh>Статус</MudTh>
+                <MudTh>Роли</MudTh>
+                <MudTh>Дата регистрации</MudTh>
+                <MudTh>Действия</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Пользователь">
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Size="Size.Small"/>
+                        @context.User.GetFullName()
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Email">@context.User.Email</MudTd>
+                <MudTd DataLabel="Статус">
+                    <MudChip T="string" Size="Size.Small" Color="@(context.User.IsActive ? Color.Success : Color.Error)">
+                        @(context.User.IsActive ? "Активен" : "Неактивен")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Роли">
+                    @string.Join(", ", context.Roles)
+                </MudTd>
+                <MudTd DataLabel="Дата регистрации">
+                    @context.User.CreatedAtUtc.ToString("dd.MM.yyyy HH:mm")
+                </MudTd>
+                <MudTd DataLabel="Действия">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenUserEditDialog(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Lock" Size="Size.Small" OnClick="@(() => ToggleUserLock(context.User))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteUser(context.User))" />
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+            </PagerContent>
+        </MudTable>
+    }
+</MudContainer>
+
+<MudDialog @bind-Visible="_editDialogVisible" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Редактирование пользователя: @_editUser?.GetFullName()</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudContainer Class="pa-0">
+            <MudTextField @bind-Value="_editFirstName" Label="Имя" T="string" Class="mb-3"/>
+            <MudTextField @bind-Value="_editLastName" Label="Фамилия" T="string" Class="mb-3"/>
+            <MudSwitch @bind-Value="_editIsActive" Label="Активен" Color="Color.Success" Class="mb-3"/>
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Роли:</MudText>
+            @foreach (var role in _allRoles)
+            {
+                <MudCheckBox @bind-Value="_editRoles[role]" Label="@role" Color="Color.Primary" Class="ml-2" />
+            }
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _editDialogVisible = false)">Отмена</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveUserChanges">Сохранить</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<UserWithRoles>? _users;
+    private string _searchTerm = string.Empty;
+    private bool? _filterActive;
+    private bool? _filterLocked;
+    private bool _editDialogVisible = false;
+    private User? _editUser;
+    private string _editFirstName, _editLastName;
+    private bool _editIsActive;
+    private Dictionary<string, bool> _editRoles = new();
+    private List<string> _allRoles = new();
+    private DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _allRoles = (await DbContext.Roles.Select(r => r.Name).ToListAsync())!;
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        var query = UserManager.Users.Include(u => u.Profile).AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(_searchTerm))
+        {
+            var term = _searchTerm.ToLower();
+            query = query.Where(u => u.Email.ToLower().Contains(term) ||
+                                     u.FirstName.ToLower().Contains(term) ||
+                                     u.LastName.ToLower().Contains(term));
+        }
+        if (_filterActive.HasValue)
+            query = query.Where(u => u.IsActive == _filterActive.Value);
+        if (_filterLocked.HasValue)
+            query = query.Where(u => _filterLocked.Value ? u.LockoutEnd != null : u.LockoutEnd == null);
+
+        var users = await query.OrderBy(u => u.CreatedAtUtc).ToListAsync();
+        _users = new List<UserWithRoles>();
+        foreach (var user in users)
+        {
+            var roles = await UserManager.GetRolesAsync(user);
+            _users.Add(new UserWithRoles
+            {
+                User = user,
+                Roles = roles.ToList()
+            });
+        }
+    }
+
+    private async Task OnSearchEnter(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await LoadUsers();
+    }
+
+    private async Task ToggleUserLock(User user)
+    {
+        if (await UserManager.IsLockedOutAsync(user))
+        {
+            await UserManager.SetLockoutEndDateAsync(user, null);
+            Snackbar.Add($"Пользователь {user.Email} разблокирован", Severity.Success);
+        }
+        else
+        {
+            await UserManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100));
+            Snackbar.Add($"Пользователь {user.Email} заблокирован", Severity.Warning);
+        }
+        await LoadUsers();
+    }
+
+    private async Task DeleteUser(User user)
+    {
+        var result = await DialogService.ShowMessageBox("Удаление пользователя",
+            $"Вы уверены, что хотите удалить {user.Email}?",
+            yesText: "Удалить", cancelText: "Отмена");
+        if (result == true)
+        {
+            user.IsActive = false; // мягкое удаление
+            await UserManager.UpdateAsync(user);
+            Snackbar.Add("Пользователь деактивирован", Severity.Warning);
+            await LoadUsers();
+        }
+    }
+
+    private async Task OpenUserEditDialog(UserWithRoles userWithRoles)
+    {
+        var user = userWithRoles.User;
+        _editUser = user;
+        _editFirstName = user.FirstName;
+        _editLastName = user.LastName;
+        _editIsActive = user.IsActive;
+        var userRoles = await UserManager.GetRolesAsync(user);
+        _editRoles = _allRoles.ToDictionary(r => r, r => userRoles.Contains(r));
+        _editDialogVisible = true;
+    }
+
+    private async Task SaveUserChanges()
+    {
+        if (_editUser == null) return;
+        _editUser.FirstName = _editFirstName;
+        _editUser.LastName = _editLastName;
+        _editUser.IsActive = _editIsActive;
+        await UserManager.UpdateAsync(_editUser);
+
+        // роли
+        foreach (var role in _allRoles)
+        {
+            bool hasRole = await UserManager.IsInRoleAsync(_editUser, role);
+            if (_editRoles[role] && !hasRole)
+                await UserManager.AddToRoleAsync(_editUser, role);
+            else if (!_editRoles[role] && hasRole)
+                await UserManager.RemoveFromRoleAsync(_editUser, role);
+        }
+
+        _editDialogVisible = false;
+        Snackbar.Add("Данные пользователя обновлены", Severity.Success);
+        await LoadUsers();
+    }
+}

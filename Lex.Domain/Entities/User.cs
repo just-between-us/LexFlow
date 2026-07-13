@@ -27,6 +27,6 @@ public class User : IdentityUser<Guid>
     public ICollection<Document> EditableDocuments { get; set; } = new List<Document>();// Документы, к которым у юзера есть доступ на редактирование (Многие-ко-многим)
     
     public ICollection<ActiveChecklist> ActiveChecklists { get; set; } = new List<ActiveChecklist>();// Чек-листы пользователя
-    
+    public string? GetFullName() => string.Join(" ", new[] { FirstName, LastName }.Where(s => !string.IsNullOrWhiteSpace(s)));
 }
 
