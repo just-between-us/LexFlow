@@ -1,3 +1,4 @@
+using BlazorKit.CopyToClipboard;
 using MudBlazor.Services;
 using Lex.Components;
 using Lex.Components.Auth;
@@ -55,6 +56,8 @@ builder.Services.AddRazorComponents()
 
 
 builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddScoped<IClipboardService, ClipboardService>();
 
 //Репы
 builder.Services.AddScoped<DocumentTemplateRepository>();

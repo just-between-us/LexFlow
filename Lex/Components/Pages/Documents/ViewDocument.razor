@@ -1,5 +1,6 @@
 ﻿@page "/documents/{id:guid}"
 @attribute [Authorize]
+@using BlazorKit.CopyToClipboard
 @using Lex.Domain.Entities
 @using Lex.Domain.Enums
 @using Lex.Infrastructure.Repositories
@@ -12,7 +13,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject IDocumentHelperService DocumentHelper
-@*@inject IJSRuntime JS*@
+@inject IClipboardService ClipboardService
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-8">
     @if (_isLoading)
@@ -159,12 +160,12 @@
                           Value="@_documentLink" ReadOnly="true"
                           Adornment="Adornment.End"
                           AdornmentIcon="@Icons.Material.Filled.ContentCopy"
-                          OnAdornmentClick="@CopyDocumentLink" />
+                          OnAdornmentClick="@(() => CopyDocumentLink(_documentLink))" />
             <MudTextField T="string" Label="Ссылка для приглашения редактора"
                           Value="@_editorInviteLink" ReadOnly="true"
                           Adornment="Adornment.End"
                           AdornmentIcon="@Icons.Material.Filled.ContentCopy"
-                          OnAdornmentClick="@CopyEditorInviteLink" />
+                          OnAdornmentClick="@(() => CopyEditorInviteLink(_editorInviteLink))" />
 
             <MudDivider />
             <MudText Typo="Typo.subtitle2">Редакторы (@_editors.Count)</MudText>
@@ -205,10 +206,8 @@
     private bool _isSaving = false;
     private bool _canEdit = false;
 
-    // Модель редактирования
     private EditModel _editModel = new();
 
-    // Текущий пользователь
     private Guid? _currentUserId;
     private bool _isAuthorized;
 
@@ -253,7 +252,6 @@
             _selectedVersion = _versions.FirstOrDefault(v => v.VersionNumber == _document.CurrentVersionNumber);
             _editors = _document.Editors.ToList();
 
-            // Инициализация модели редактирования
             _editModel = new EditModel
             {
                 Title = _document.Title,
@@ -293,14 +291,12 @@
 
         try
         {
-            // Обновляем основные поля документа
             _document!.Title = _editModel.Title;
             _document.Description = _editModel.Description;
             _document.Type = _editModel.Type;
             _document.Privacy = _editModel.Privacy;
             _document.UpdatedAtUtc = DateTime.UtcNow;
 
-            // Создаем новую версию с новым контентом
             var newVersion = new DocumentVersion
             {
                 Id = Guid.NewGuid(),
@@ -338,6 +334,7 @@
     private void CancelEdit()
     {
         _editMode = false;
+        
         // Сбросить модель к текущей версии
         _editModel = new EditModel
         {
@@ -352,15 +349,15 @@
     private void OpenShareDialog() => _shareDialogVisible = true;
     private void CloseShareDialog() => _shareDialogVisible = false;
 
-    private async Task CopyDocumentLink()
+    private async Task CopyDocumentLink(string documentLink)
     {
-        /*await JS.InvokeVoidAsync("clipboardCopy.copyText", _documentLink);*/
+        await ClipboardService.CopyToClipboard(documentLink);
         Snackbar.Add("Ссылка скопирована", Severity.Info);
     }
 
-    private async Task CopyEditorInviteLink()
+    private async Task CopyEditorInviteLink(string editorInviteLink)
     {
-        /*await JS.InvokeVoidAsync("clipboardCopy.copyText", _editorInviteLink);*/
+        await ClipboardService.CopyToClipboard(editorInviteLink);
         Snackbar.Add("Ссылка для редактора скопирована", Severity.Info);
     }
 
