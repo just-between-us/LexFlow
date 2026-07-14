@@ -3,9 +3,11 @@
 @using Lex.Domain.Entities
 @using Lex.Domain.Enums
 @using Lex.Components.Auth
+@using Lex.Components.Utils
 @using Lex.Domain.Interfaces
 @using Microsoft.AspNetCore.Authorization
 @using Markdig
+@inject IDocumentHelperService DocumentHelperService
 @inject IDocumentService DocumentService
 @inject UserContext UserContext
 @inject ISnackbar Snackbar
@@ -50,7 +52,7 @@
                                 @foreach (DocumentType type in Enum.GetValues(typeof(DocumentType)))
                                 {
                                     <MudSelectItem T="DocumentType" Value="type">
-                                        @GetTypeDisplayName(type)
+                                        @DocumentHelperService.GetTypeDisplayName(type)
                                     </MudSelectItem>
                                 }
                             </MudSelect>
@@ -61,7 +63,7 @@
                                 @foreach (DocumentPrivacy privacy in Enum.GetValues(typeof(DocumentPrivacy)))
                                 {
                                     <MudSelectItem T="DocumentPrivacy" Value="privacy">
-                                        @GetPrivacyDisplayName(privacy)
+                                        @DocumentHelperService.GetPrivacyDisplayName(privacy)
                                     </MudSelectItem>
                                 }
                             </MudSelect>
@@ -75,7 +77,7 @@
 
                             <div class="d-flex align-center gap-2 mt-2">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    Статус: @GetStatusDisplayName(_document.Status)
+                                    Статус: @DocumentHelperService.GetStatusDisplayName(_document.Status)
                                 </MudText>
                                 <MudSwitch @bind-Value="_archiveImmediately" Label="Сразу в архив" Color="Color.Warning" />
                             </div>
@@ -265,32 +267,4 @@
     {
         Navigation.NavigateTo(TemplateId.HasValue ? $"/templates/view/{TemplateId}" : "/templates");
     }
-
-    private static string GetTypeDisplayName(DocumentType type) => type switch
-    {
-        DocumentType.Contract => "Договор",
-        DocumentType.Claim => "Иск",
-        DocumentType.Policy => "Политика",
-        DocumentType.Agreement => "Соглашение",
-        DocumentType.Consent => "Согласие",
-        _ => "Прочее"
-    };
-
-    private static string GetStatusDisplayName(DocumentStatus status) => status switch
-    {
-        DocumentStatus.Draft => "Черновик",
-        DocumentStatus.InReview => "На проверке",
-        DocumentStatus.Ready => "Готов",
-        DocumentStatus.Signed => "Подписан",
-        DocumentStatus.Archived => "Архив",
-        _ => "Неизвестно"
-    };
-
-    private static string GetPrivacyDisplayName(DocumentPrivacy privacy) => privacy switch
-    {
-        DocumentPrivacy.Private => "Только автор",
-        DocumentPrivacy.Public => "Видно всем",
-        DocumentPrivacy.Protected => "Видно всем, редактирует только автор",
-        _ => "Неизвестно"
-    };
 }

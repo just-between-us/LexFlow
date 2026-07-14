@@ -1,6 +1,8 @@
-﻿namespace Lex.Application.DTOs;
+﻿using Lex.Application.DTOs;
 
-public class EditModel
+namespace Lex.Domain.DTOs;
+
+public class ChecklistEditModel
 {
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;

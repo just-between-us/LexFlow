@@ -69,6 +69,7 @@ builder.Services.AddScoped<DocumentVersionRepository>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IChecklistCatalogService, ChecklistCatalogService>();
 builder.Services.AddScoped<ITemplateCatalogService, TemplateCatalogService>();
+builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 
 //Утилитарный сервис для получения имени из enum
 builder.Services.AddScoped<IDocumentHelperService, DocumentHelperService>();

@@ -1023,3 +1023,47 @@ html {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
+
+
+/* Панель версий - абсолютное позиционирование */
+.version-panel-overlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1300;
+    pointer-events: none; /* клики проходят сквозь фон */
+}
+
+.version-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 350px;
+    max-width: 90vw;
+    background: var(--mud-palette-background);
+    box-shadow: -4px 0 12px rgba(0,0,0,0.15);
+    pointer-events: auto;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    animation: slideInRight 0.25s ease-out;
+}
+
+.version-panel .version-list-container {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.version-list {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start; /* элементы сверху */
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}

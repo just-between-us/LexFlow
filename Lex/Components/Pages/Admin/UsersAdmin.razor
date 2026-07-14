@@ -2,12 +2,9 @@
 @attribute [Authorize(Roles = "Admin")]
 @using Lex.Domain.DTOs
 @using Lex.Domain.Entities
-@using Lex.Infrastructure.Data
+@using Lex.Domain.Interfaces
 @using Microsoft.AspNetCore.Authorization
-@using Microsoft.AspNetCore.Identity
-@using Microsoft.EntityFrameworkCore
-@inject UserManager<User> UserManager
-@inject AppDbContext DbContext
+@inject IUserManagementService UserService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
@@ -116,9 +113,9 @@
             <MudTextField @bind-Value="_editLastName" Label="Фамилия" T="string" Class="mb-3"/>
             <MudSwitch @bind-Value="_editIsActive" Label="Активен" Color="Color.Success" Class="mb-3"/>
             <MudText Typo="Typo.subtitle2" Class="mb-2">Роли:</MudText>
-            @foreach (var role in _allRoles)
+            @foreach (var item in _editRolesList)
             {
-                <MudCheckBox @bind-Value="_editRoles[role]" Label="@role" Color="Color.Primary" Class="ml-2" />
+                <MudCheckBox @bind-Value="item.Selected" Label="@item.Name" Color="Color.Primary" Class="ml-2" />
             }
         </MudContainer>
     </DialogContent>
@@ -135,45 +132,29 @@
     private bool? _filterLocked;
     private bool _editDialogVisible = false;
     private User? _editUser;
-    private string _editFirstName, _editLastName;
+    private string _editFirstName = string.Empty;
+    private string _editLastName = string.Empty;
     private bool _editIsActive;
     private Dictionary<string, bool> _editRoles = new();
     private List<string> _allRoles = new();
     private DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+    private List<RoleSelection> _editRolesList = new();
+
+    public class RoleSelection
+    {
+        public string Name { get; set; }
+        public bool Selected { get; set; }
+    }
 
     protected override async Task OnInitializedAsync()
     {
-        _allRoles = (await DbContext.Roles.Select(r => r.Name).ToListAsync())!;
+        _allRoles = await UserService.GetAllRoleNamesAsync();
         await LoadUsers();
     }
 
     private async Task LoadUsers()
     {
-        var query = UserManager.Users.Include(u => u.Profile).AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(_searchTerm))
-        {
-            var term = _searchTerm.ToLower();
-            query = query.Where(u => u.Email.ToLower().Contains(term) ||
-                                     u.FirstName.ToLower().Contains(term) ||
-                                     u.LastName.ToLower().Contains(term));
-        }
-        if (_filterActive.HasValue)
-            query = query.Where(u => u.IsActive == _filterActive.Value);
-        if (_filterLocked.HasValue)
-            query = query.Where(u => _filterLocked.Value ? u.LockoutEnd != null : u.LockoutEnd == null);
-
-        var users = await query.OrderBy(u => u.CreatedAtUtc).ToListAsync();
-        _users = new List<UserWithRoles>();
-        foreach (var user in users)
-        {
-            var roles = await UserManager.GetRolesAsync(user);
-            _users.Add(new UserWithRoles
-            {
-                User = user,
-                Roles = roles.ToList()
-            });
-        }
+        _users = await UserService.GetUsersAsync(_searchTerm, _filterActive, _filterLocked);
     }
 
     private async Task OnSearchEnter(KeyboardEventArgs e)
@@ -183,28 +164,19 @@
 
     private async Task ToggleUserLock(User user)
     {
-        if (await UserManager.IsLockedOutAsync(user))
-        {
-            await UserManager.SetLockoutEndDateAsync(user, null);
-            Snackbar.Add($"Пользователь {user.Email} разблокирован", Severity.Success);
-        }
-        else
-        {
-            await UserManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100));
-            Snackbar.Add($"Пользователь {user.Email} заблокирован", Severity.Warning);
-        }
+        await UserService.ToggleUserLockAsync(user);
+        Snackbar.Add(await IsLockedOutAsync(user) ? "Заблокирован" : "Разблокирован", Severity.Success);
         await LoadUsers();
     }
 
     private async Task DeleteUser(User user)
     {
         var result = await DialogService.ShowMessageBox("Удаление пользователя",
-            $"Вы уверены, что хотите удалить {user.Email}?",
-            yesText: "Удалить", cancelText: "Отмена");
+            $"Деактивировать {user.Email}?",
+            yesText: "Деактивировать", cancelText: "Отмена");
         if (result == true)
         {
-            user.IsActive = false; // мягкое удаление
-            await UserManager.UpdateAsync(user);
+            await UserService.SoftDeleteUserAsync(user);
             Snackbar.Add("Пользователь деактивирован", Severity.Warning);
             await LoadUsers();
         }
@@ -214,34 +186,30 @@
     {
         var user = userWithRoles.User;
         _editUser = user;
-        _editFirstName = user.FirstName;
-        _editLastName = user.LastName;
+        _editFirstName = user.FirstName ?? "";
+        _editLastName = user.LastName ?? "";
         _editIsActive = user.IsActive;
-        var userRoles = await UserManager.GetRolesAsync(user);
-        _editRoles = _allRoles.ToDictionary(r => r, r => userRoles.Contains(r));
+        _editRolesList = _allRoles.Select(r => new RoleSelection 
+        { 
+            Name = r, 
+            Selected = userWithRoles.Roles.Contains(r) 
+        }).ToList();
+        _editRoles = _allRoles.ToDictionary(r => r, r => userWithRoles.Roles.Contains(r));
         _editDialogVisible = true;
     }
 
     private async Task SaveUserChanges()
     {
         if (_editUser == null) return;
-        _editUser.FirstName = _editFirstName;
-        _editUser.LastName = _editLastName;
-        _editUser.IsActive = _editIsActive;
-        await UserManager.UpdateAsync(_editUser);
-
-        // роли
-        foreach (var role in _allRoles)
-        {
-            bool hasRole = await UserManager.IsInRoleAsync(_editUser, role);
-            if (_editRoles[role] && !hasRole)
-                await UserManager.AddToRoleAsync(_editUser, role);
-            else if (!_editRoles[role] && hasRole)
-                await UserManager.RemoveFromRoleAsync(_editUser, role);
-        }
-
+        await UserService.UpdateUserAsync(_editUser, _editFirstName, _editLastName, _editIsActive, _editRoles);
         _editDialogVisible = false;
-        Snackbar.Add("Данные пользователя обновлены", Severity.Success);
+        Snackbar.Add("Данные обновлены", Severity.Success);
         await LoadUsers();
+    }
+
+    private async Task<bool> IsLockedOutAsync(User user)
+    {
+        var freshUser = await UserService.GetUsersAsync(null, null, null);
+        return freshUser.FirstOrDefault(u => u.User.Id == user.Id)?.User.LockoutEnd != null;
     }
 }

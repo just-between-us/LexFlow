@@ -1,6 +1,7 @@
 ﻿@page "/admin/checklists"
 @attribute [Authorize(Roles = "Admin")]
 @using Lex.Application.DTOs
+@using Lex.Domain.DTOs
 @using Lex.Domain.Entities
 @using Lex.Infrastructure.Data
 @using Microsoft.AspNetCore.Authorization
@@ -107,10 +108,10 @@
     </TitleContent>
     <DialogContent>
         <MudContainer Class="pa-0">
-            <MudTextField @bind-Value="_editModel.Title" Label="Название" 
+            <MudTextField @bind-Value="_checklistEditModel.Title" Label="Название" 
                           Required="true" T="string" Class="mb-4"/>
             
-            <MudTextField @bind-Value="_editModel.Description" Label="Описание" 
+            <MudTextField @bind-Value="_checklistEditModel.Description" Label="Описание" 
                           Lines="3" T="string" Class="mb-4"/>
             
             <MudText Typo="Typo.subtitle2" Class="mb-2">Теги (Chips)</MudText>
@@ -120,10 +121,10 @@
                           AdornmentIcon="@Icons.Material.Filled.Add"
                           OnAdornmentClick="@AddChip" Class="mb-2"/>
             
-            @if (_editModel.Chips.Any())
+            @if (_checklistEditModel.Chips.Any())
             {
                 <div class="d-flex flex-wrap gap-2 mb-4">
-                    @foreach (var chip in _editModel.Chips)
+                    @foreach (var chip in _checklistEditModel.Chips)
                     {
                         <MudChip T="string" Size="Size.Small" Color="Color.Primary" 
                                  Variant="Variant.Outlined"
@@ -143,17 +144,17 @@
                            OnClick="@AddItem">Добавить пункт</MudButton>
             </div>
             
-            @if (_editModel.Items.Any())
+            @if (_checklistEditModel.Items.Any())
             {
                 <MudList T="string" Class="items-list">
-                    @for (int i = 0; i < _editModel.Items.Count; i++)
+                    @for (int i = 0; i < _checklistEditModel.Items.Count; i++)
                     {
                         var index = i;
-                        var item = _editModel.Items[i];
+                        var item = _checklistEditModel.Items[i];
                         <MudListItem T="string" Class="item-row">
                             <div class="d-flex gap-3 align-center w-100">
                                 <MudText Typo="Typo.caption" Class="item-order">@(index + 1)</MudText>
-                                <MudTextField @bind-Value="_editModel.Items[index].Title" 
+                                <MudTextField @bind-Value="_checklistEditModel.Items[index].Title" 
                                               Label="Название пункта" T="string"
                                               Class="flex-grow-1"/>
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" 
@@ -169,7 +170,7 @@
     <DialogActions>
         <MudButton OnClick="@CancelDialog" Color="Color.Secondary">Отмена</MudButton>
         <MudButton OnClick="@SaveChecklist" Variant="Variant.Filled" Color="Color.Primary"
-                   Disabled="@(string.IsNullOrWhiteSpace(_editModel.Title) || _editModel.Items.Count == 0)">
+                   Disabled="@(string.IsNullOrWhiteSpace(_checklistEditModel.Title) || _checklistEditModel.Items.Count == 0)">
             Сохранить
         </MudButton>
     </DialogActions>
@@ -180,7 +181,7 @@
     private string _searchQuery = string.Empty;
     private bool _dialogVisible;
     private Checklist? _editingChecklist;
-    private EditModel _editModel = new();
+    private ChecklistEditModel _checklistEditModel = new();
     private string _newChip = string.Empty;
     
     private readonly DialogOptions _dialogOptions = new() 
@@ -219,14 +220,14 @@
     private void OpenCreateDialog()
     {
         _editingChecklist = null;
-        _editModel = new EditModel();
+        _checklistEditModel = new ChecklistEditModel();
         _dialogVisible = true;
     }
 
     private void OpenEditDialog(Checklist checklist)
     {
         _editingChecklist = checklist;
-        _editModel = new EditModel
+        _checklistEditModel = new ChecklistEditModel
         {
             Title = checklist.Title,
             Description = checklist.Description,
@@ -245,7 +246,7 @@
 
     private async Task SaveChecklist()
     {
-        if (string.IsNullOrWhiteSpace(_editModel.Title) || _editModel.Items.Count == 0)
+        if (string.IsNullOrWhiteSpace(_checklistEditModel.Title) || _checklistEditModel.Items.Count == 0)
             return;
 
         // Создаём контекст для операции записи
@@ -257,17 +258,17 @@
             var checklist = new Checklist
             {
                 Id = Guid.NewGuid(),
-                Title = _editModel.Title,
-                Description = _editModel.Description,
+                Title = _checklistEditModel.Title,
+                Description = _checklistEditModel.Description,
                 CreatedAtUtc = DateTime.UtcNow,
                 // Чипсы – создаём объекты ChecklistChip
-                Chips = _editModel.Chips.Select(chip => new ChecklistChip
+                Chips = _checklistEditModel.Chips.Select(chip => new ChecklistChip
                 {
                     Id = Guid.NewGuid(),
                     ChecklistId = Guid.NewGuid(), // временно, присвоим ниже
                     Chip = chip
                 }).ToList(),
-                Items = _editModel.Items.Select((item, index) => new ChecklistItem
+                Items = _checklistEditModel.Items.Select((item, index) => new ChecklistItem
                 {
                     Id = Guid.NewGuid(),
                     Title = item.Title,
@@ -294,13 +295,13 @@
                 .Include(c => c.Chips)
                 .FirstAsync(c => c.Id == _editingChecklist.Id);
 
-            checklist.Title = _editModel.Title;
-            checklist.Description = _editModel.Description;
+            checklist.Title = _checklistEditModel.Title;
+            checklist.Description = _checklistEditModel.Description;
             checklist.UpdatedAtUtc = DateTime.UtcNow;
 
             // Обновляем чипсы: удаляем старые, добавляем новые
             context.ChecklistChips.RemoveRange(checklist.Chips);
-            checklist.Chips = _editModel.Chips.Select(chip => new ChecklistChip
+            checklist.Chips = _checklistEditModel.Chips.Select(chip => new ChecklistChip
             {
                 Id = Guid.NewGuid(),
                 ChecklistId = checklist.Id,
@@ -309,7 +310,7 @@
 
             // Обновляем пункты: заменяем коллекцию
             context.ChecklistItems.RemoveRange(checklist.Items);
-            checklist.Items = _editModel.Items.Select((item, index) => new ChecklistItem
+            checklist.Items = _checklistEditModel.Items.Select((item, index) => new ChecklistItem
             {
                 Id = Guid.NewGuid(),
                 ChecklistId = checklist.Id,
@@ -354,15 +355,15 @@
     private void CancelDialog()
     {
         _dialogVisible = false;
-        _editModel = new EditModel();
+        _checklistEditModel = new ChecklistEditModel();
     }
 
     // --- Управление чипсами в EditModel (List<string>) ---
     private void AddChip()
     {
-        if (!string.IsNullOrWhiteSpace(_newChip) && !_editModel.Chips.Contains(_newChip))
+        if (!string.IsNullOrWhiteSpace(_newChip) && !_checklistEditModel.Chips.Contains(_newChip))
         {
-            _editModel.Chips.Add(_newChip.Trim());
+            _checklistEditModel.Chips.Add(_newChip.Trim());
             _newChip = string.Empty;
         }
     }
@@ -377,16 +378,16 @@
 
     private void RemoveChip(string chip)
     {
-        _editModel.Chips.Remove(chip);
+        _checklistEditModel.Chips.Remove(chip);
     }
 
     private void AddItem()
     {
-        _editModel.Items.Add(new ItemModel { Order = _editModel.Items.Count + 1 });
+        _checklistEditModel.Items.Add(new ItemModel { Order = _checklistEditModel.Items.Count + 1 });
     }
 
     private void RemoveItem(int index)
     {
-        _editModel.Items.RemoveAt(index);
+        _checklistEditModel.Items.RemoveAt(index);
     }
 }
