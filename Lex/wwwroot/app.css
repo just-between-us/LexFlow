@@ -663,18 +663,6 @@ html {
     font-weight: 500 !important;
     font-size: 12px !important;
 }
-.template-card {
-    border-radius: 16px !important;
-    border: 1px solid var(--mud-palette-lines-default);
-    transition: all 0.3s ease;
-    height: 100%;
-}
-
-.template-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--nav-shadow) !important;
-    border-color: var(--legal-primary);
-}
 
 .hint-row {
     border: 1px solid var(--mud-palette-lines-default);
@@ -1012,6 +1000,36 @@ html {
 
 .card-title {
     font-weight: 600 !important;
+}
+/* Базовые стили карточки */
+.template-card {
+    border-radius: 16px !important;
+    border: 1px solid var(--mud-palette-lines-default);
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.template-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--legal-primary);
+}
+
+/* Свечение для популярных */
+.glow-popular:hover {
+    box-shadow: 0 0 20px rgba(255, 193, 7, 0.5) !important;
+    border-color: #ffc107;
+}
+
+/* Свечение для новых */
+.glow-new:hover {
+    box-shadow: 0 0 20px rgba(156, 39, 176, 0.5) !important;
+    border-color: #9c27b0;
+}
+
+/* Комбинированное свечение (и новый, и популярный) */
+.glow-new-popular:hover {
+    box-shadow: 0 0 20px rgba(156, 39, 176, 0.5), 0 0 20px rgba(255, 193, 7, 0.5) !important;
+    border-color: #9c27b0;
 }
 
 /* Анимация вращения для кнопки обновления */

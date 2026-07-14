@@ -1,13 +1,17 @@
 ﻿@page "/templates"
+@using Lex.Components.Shared
+@using Lex.Components.Utils
 @using Lex.Domain.DTOs
 @using Lex.Domain.Enums
 @using Lex.Domain.Interfaces
 @inject ITemplateCatalogService CatalogService
 @inject NavigationManager NavigationManager
+@inject IDocumentHelperService DocumentHelperService
+
 <div class="py-4">
     <PageTitle>Каталог шаблонов</PageTitle>
 </div>
-<div class="templates-page">
+<div>
     <div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
         <div>
             <MudText Typo="Typo.h4">Каталог шаблонов документов</MudText>
@@ -45,7 +49,7 @@
                 @foreach (var type in Enum.GetValues<DocumentType>())
                 {
                     <MudSelectItem Value="@((DocumentType?)type)">
-                        @GetTypeDisplayName(type)
+                        @DocumentHelperService.GetTypeDisplayName(type)
                     </MudSelectItem>
                 }
             </MudSelect>
@@ -112,7 +116,7 @@
                 @if (_selectedType.HasValue)
                 {
                     <MudChip T="string" Size="Size.Small" OnClose="@(() => ClearTypeFilter())">
-                        @GetTypeDisplayName(_selectedType.Value)
+                        @DocumentHelperService.GetTypeDisplayName(_selectedType.Value)
                     </MudChip>
                 }
                 <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@ResetFilters">
@@ -161,88 +165,7 @@
             @foreach (var template in _templates)
             {
                 <MudItem xs="12" sm="6" md="4" lg="3">
-                    <MudCard Elevation="1" Class="@($"template-card type-{template.Type.ToString().ToLower()} h-100 d-flex flex-column")">
-                        <MudCardContent Class="flex-grow-1">
-                            <div class="d-flex align-start justify-space-between mb-2 gap-2" style="min-width: 0;">
-                                <div class="d-flex align-center gap-2" style="min-width: 0; width: 100%;">
-                                    <MudIcon Icon="@GetTypeIcon(template.Type)" Color="@GetTypeColor(template.Type)" Class="flex-shrink-0" />
-        
-                                    <!-- Всплывающая подсказка при наведении -->
-                                    <MudTooltip Text="@template.Title" Arrow="true" Placement="Placement.Top">
-                                        <MudText Typo="Typo.h6" Class="card-title mud-text-truncate" Style="width: 100%;">
-                                            @template.Title
-                                        </MudText>
-                                    </MudTooltip>
-                                </div>
-                            </div>
-
-
-                            <div class="d-flex gap-1 mb-2 flex-wrap">
-                                <MudChip T="string" Size="Size.Small" Color="@GetTypeColor(template.Type)" Variant="Variant.Filled">
-                                    @GetTypeDisplayName(template.Type)
-                                </MudChip>
-                                @if (template.IsPopular)
-                                {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.LocalFireDepartment">
-                                        Популярный
-                                    </MudChip>
-                                }
-                                @if (template.IsNew)
-                                {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.AutoAwesome">
-                                        Новый
-                                    </MudChip>
-                                }
-                            </div>
-
-                            <MudText Typo="Typo.body2" Class="text-muted card-description mb-3">
-                                @template.Description
-                            </MudText>
-
-                            <div class="d-flex align-center gap-2 mb-1">
-                                <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Small" Class="text-muted" />
-                                <MudText Typo="Typo.caption" Class="text-muted">
-                                    Использован @template.UsageCount раз(а)
-                                </MudText>
-                            </div>
-
-                            <div class="d-flex align-center gap-2 mb-1">
-                                <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="text-muted" />
-                                <MudText Typo="Typo.caption" Class="text-muted">
-                                    @template.CreatedAtUtc.ToString("dd.MM.yyyy")
-                                </MudText>
-                            </div>
-
-                            @if (template.HintsCount > 0)
-                            {
-                                <div class="d-flex align-center gap-2 mt-2">
-                                    <MudIcon Icon="@Icons.Material.Filled.TipsAndUpdates" Size="Size.Small" Color="Color.Info" />
-                                    <MudText Typo="Typo.caption" Color="Color.Info">
-                                        @template.HintsCount подсказок
-                                    </MudText>
-                                </div>
-                            }
-                        </MudCardContent>
-
-                        <MudCardActions Class="border-top pa-2 gap-1">
-                            <MudButton StartIcon="@Icons.Material.Filled.Visibility"
-                                       Color="Color.Default"
-                                       Variant="Variant.Text"
-                                       Size="Size.Small"
-                                       OnClick="@(() => ViewTemplate(template.Id))"
-                                       FullWidth>
-                                Просмотр
-                            </MudButton>
-                            <MudButton StartIcon="@Icons.Material.Filled.Add"
-                                       Color="Color.Primary"
-                                       Variant="Variant.Filled"
-                                       Size="Size.Small"
-                                       OnClick="@(() => UseTemplate(template.Id))"
-                                       FullWidth>
-                                Использовать
-                            </MudButton>
-                        </MudCardActions>
-                    </MudCard>
+                    <TemplateCard Template="@template" />
                 </MudItem>
             }
         </MudGrid>
@@ -417,33 +340,4 @@
     private void ViewTemplate(Guid id) => NavigationManager.NavigateTo($"/templates/view/{id}");
     private void UseTemplate(Guid id) => NavigationManager.NavigateTo($"/documents/create?templateId={id}");
 
-    private static string GetTypeDisplayName(DocumentType type) => type switch
-    {
-        DocumentType.Contract => "Договор",
-        DocumentType.Claim => "Иск",
-        DocumentType.Policy => "Политика",
-        DocumentType.Agreement => "Соглашение",
-        DocumentType.Consent => "Согласие",
-        _ => "Прочее"
-    };
-
-    private static Color GetTypeColor(DocumentType type) => type switch
-    {
-        DocumentType.Contract => Color.Primary,
-        DocumentType.Claim => Color.Error,
-        DocumentType.Policy => Color.Warning,
-        DocumentType.Agreement => Color.Info,
-        DocumentType.Consent => Color.Success,
-        _ => Color.Dark
-    };
-
-    private static string GetTypeIcon(DocumentType type) => type switch
-    {
-        DocumentType.Contract => Icons.Material.Filled.Description,
-        DocumentType.Claim => Icons.Material.Filled.Gavel,
-        DocumentType.Policy => Icons.Material.Filled.Policy,
-        DocumentType.Agreement => Icons.Material.Filled.Handshake,
-        DocumentType.Consent => Icons.Material.Filled.HowToReg,
-        _ => Icons.Material.Filled.InsertDriveFile
-    };
 }

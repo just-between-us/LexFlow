@@ -1,0 +1,111 @@
+﻿@using Lex.Components.Utils
+@using Lex.Domain.DTOs
+@inject IDocumentHelperService DocumentHelperService
+@inject NavigationManager NavigationManager
+
+<MudCard Elevation="1" Class="@CardClasses">
+    <MudCardContent Class="flex-grow-1">
+        <div class="d-flex align-start justify-space-between mb-2 gap-2" style="min-width: 0;">
+            <div class="d-flex align-center gap-2" style="min-width: 0; width: 100%;">
+                <MudIcon Icon="@DocumentHelperService.GetTypeIcon(Template.Type)" 
+                         Color="@DocumentHelperService.GetTypeColor(Template.Type)" 
+                         Class="flex-shrink-0" />
+                <MudTooltip Text="@Template.Title" Arrow="true" Placement="Placement.Top">
+                    <MudText Typo="Typo.h6" Class="card-title mud-text-truncate" Style="width: 100%;">
+                        @Template.Title
+                    </MudText>
+                </MudTooltip>
+            </div>
+        </div>
+
+        <div class="d-flex gap-1 mb-2 flex-wrap">
+            <MudChip T="string" Size="Size.Small" 
+                     Color="@DocumentHelperService.GetTypeColor(Template.Type)" 
+                     Variant="Variant.Filled">
+                @DocumentHelperService.GetTypeDisplayName(Template.Type)
+            </MudChip>
+            @if (Template.IsPopular)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Warning" 
+                         Icon="@Icons.Material.Filled.LocalFireDepartment">
+                    Популярный
+                </MudChip>
+            }
+            @if (Template.IsNew)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success" 
+                         Icon="@Icons.Material.Filled.AutoAwesome">
+                    Новый
+                </MudChip>
+            }
+        </div>
+
+        <MudText Typo="Typo.body2" Class="text-muted mb-3">
+            @Template.Description
+        </MudText>
+
+        <div class="d-flex align-center gap-2 mb-1">
+            <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Small" Class="text-muted" />
+            <MudText Typo="Typo.caption" Class="text-muted">
+                Использован @Template.UsageCount раз(а)
+            </MudText>
+        </div>
+
+        <div class="d-flex align-center gap-2 mb-1">
+            <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="text-muted" />
+            <MudText Typo="Typo.caption" Class="text-muted">
+                @Template.CreatedAtUtc.ToString("dd.MM.yyyy")
+            </MudText>
+        </div>
+
+        @if (Template.HintsCount > 0)
+        {
+            <div class="d-flex align-center gap-2 mt-2">
+                <MudIcon Icon="@Icons.Material.Filled.TipsAndUpdates" Size="Size.Small" Color="Color.Info" />
+                <MudText Typo="Typo.caption" Color="Color.Info">
+                    @Template.HintsCount подсказок
+                </MudText>
+            </div>
+        }
+    </MudCardContent>
+
+    <MudCardActions Class="border-top pa-2 gap-1">
+        <MudButton StartIcon="@Icons.Material.Filled.Visibility"
+                   Color="Color.Default"
+                   Variant="Variant.Text"
+                   Size="Size.Small"
+                   OnClick="@(() => ViewTemplate(Template.Id))"
+                   FullWidth>
+            Просмотр
+        </MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.Add"
+                   Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Size="Size.Small"
+                   OnClick="@(() => UseTemplate(Template.Id))"
+                   FullWidth>
+            Использовать
+        </MudButton>
+    </MudCardActions>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public DocumentTemplateDto Template { get; set; } = default!;
+
+    private string CardClasses => $"{GetCardClasses()} h-100 d-flex flex-column";
+    
+    private string GetCardClasses()
+    {
+        var baseClass = "template-card";
+        if (Template.IsNew && Template.IsPopular) // averageUsage > 0 && usage >= averageUsage * 1.5, 
+            return $"{baseClass} glow-new-popular";
+        if (Template.IsNew) //14 дней
+            return $"{baseClass} glow-new";
+        if (Template.IsPopular)
+            return $"{baseClass} glow-popular";
+        return baseClass;
+    }
+
+    private void ViewTemplate(Guid id) => NavigationManager.NavigateTo($"/templates/view/{id}");
+    private void UseTemplate(Guid id) => NavigationManager.NavigateTo($"/documents/create?templateId={id}");
+}
