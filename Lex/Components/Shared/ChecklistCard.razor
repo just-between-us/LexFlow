@@ -1,0 +1,123 @@
+﻿@using Lex.Domain.DTOs
+
+<MudCard Elevation="1" Class="@CardClasses">
+    <MudCardContent Class="flex-grow-1">
+        <div class="d-flex align-start justify-space-between mb-2 gap-2">
+            <div class="d-flex align-center gap-2" style="min-width: 0; width: 100%;">
+                <MudIcon Icon="@Icons.Material.Filled.Checklist" Color="Color.Primary" Class="flex-shrink-0" />
+                <MudTooltip Text="@Checklist.Title" Arrow="true" Placement="Placement.Top">
+                    <MudText Typo="Typo.h6" Class="card-title mud-text-truncate" Style="width: 100%;">
+                        @Checklist.Title
+                    </MudText>
+                </MudTooltip>
+            </div>
+        </div>
+
+        <div class="d-flex gap-1 mb-2 flex-wrap">
+            @if (Checklist.IsPopular)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.LocalFireDepartment">
+                    Популярный
+                </MudChip>
+            }
+            @if (Checklist.IsNew)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.AutoAwesome">
+                    Новый
+                </MudChip>
+            }
+        </div>
+
+        <MudText Typo="Typo.body2" Class="text-muted mb-3">
+            @Checklist.Description
+        </MudText>
+
+        @if (Checklist.Chips.Any())
+        {
+            <div class="d-flex flex-wrap gap-1 mb-2">
+                @foreach (var chip in Checklist.Chips.Take(3))
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
+                        @chip
+                    </MudChip>
+                }
+                @if (Checklist.Chips.Count > 3)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Text">
+                        +@(Checklist.Chips.Count - 3)
+                    </MudChip>
+                }
+            </div>
+        }
+
+        <div class="d-flex align-center gap-2 mb-1">
+            <MudIcon Icon="@Icons.Material.Filled.ListAlt" Size="Size.Small" Class="text-muted" />
+            <MudText Typo="Typo.caption" Class="text-muted">
+                @Checklist.ItemsCount пунктов
+            </MudText>
+        </div>
+
+        <div class="d-flex align-center gap-2 mb-1">
+            <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Small" Class="text-muted" />
+            <MudText Typo="Typo.caption" Class="text-muted">
+                Использован @Checklist.UsageCount раз(а)
+            </MudText>
+        </div>
+
+        <div class="d-flex align-center gap-2 mb-1">
+            <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="text-muted" />
+            <MudText Typo="Typo.caption" Class="text-muted">
+                @Checklist.CreatedAtUtc.ToString("dd.MM.yyyy")
+            </MudText>
+        </div>
+    </MudCardContent>
+
+    <MudCardActions Class="border-top pa-2 gap-1">
+        <MudButton StartIcon="@Icons.Material.Filled.Visibility"
+                   Color="Color.Default"
+                   Variant="Variant.Text"
+                   Size="Size.Small"
+                   OnClick="@(() => OpenPreviewDialog(Checklist.Id))"
+                   FullWidth>
+            Пункты
+        </MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.PlayArrow"
+                   Color="Color.Success"
+                   Variant="Variant.Filled"
+                   Size="Size.Small"
+                   OnClick="@(() => StartChecklist(Checklist.Id))"
+                   FullWidth>
+            Начать
+        </MudButton>
+    </MudCardActions>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public ChecklistDto Checklist { get; set; } = default!;
+
+    private string CardClasses => $"{GetGlowClass()} checklist-card h-100 d-flex flex-column";
+
+    private string GetGlowClass()
+    {
+        if (Checklist.IsNew && Checklist.IsPopular)
+            return "checklist-card-glow-new-popular";
+        if (Checklist.IsNew)
+            return "checklist-card-glow-new";
+        if (Checklist.IsPopular)
+            return "checklist-card-glow-popular";
+        return "checklist-card";
+    }
+
+    private async Task OpenPreviewDialog(Guid checklistId)
+    {
+        await OnPreviewRequested.InvokeAsync(checklistId);
+    }
+
+    [Parameter] public EventCallback<Guid> OnPreviewRequested { get; set; }
+    [Parameter] public EventCallback<Guid> OnStartRequested { get; set; }
+
+    private async Task StartChecklist(Guid id)
+    {
+        await OnStartRequested.InvokeAsync(id);
+    }
+}

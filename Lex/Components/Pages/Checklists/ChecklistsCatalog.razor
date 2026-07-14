@@ -1,5 +1,6 @@
 ﻿@page "/checklists/templates"
 @using Lex.Components.Dialogs
+@using Lex.Components.Shared
 @using Lex.Domain.DTOs
 @using Lex.Domain.Interfaces
 @inject IChecklistCatalogService CatalogService
@@ -9,7 +10,7 @@
 <div class="py-4">
     <PageTitle>Каталог чек-листов</PageTitle>
 </div>
-<div class="checklists-page">
+<div>
     <div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
         <div>
             <MudText Typo="Typo.h4">Каталог чек-листов</MudText>
@@ -166,97 +167,9 @@
             @foreach (var checklist in _checklists)
             {
                 <MudItem xs="12" sm="6" md="4" lg="3">
-                    <MudCard Elevation="1" Class="checklist-card h-100 d-flex flex-column">
-                        <MudCardContent Class="flex-grow-1">
-                            <div class="d-flex align-start justify-space-between mb-2 gap-2">
-                                <div class="d-flex align-center gap-2" style="min-width: 0; width: 100%;">
-                                    <MudIcon Icon="@Icons.Material.Filled.Checklist" Color="Color.Primary" Class="flex-shrink-0" />
-                                    <MudTooltip Text="@checklist.Title" Arrow="true" Placement="Placement.Top">
-                                        <MudText Typo="Typo.h6" Class="card-title mud-text-truncate" Style="width: 100%;">
-                                            @checklist.Title
-                                        </MudText>
-                                    </MudTooltip>
-                                </div>
-                            </div>
-
-                            <div class="d-flex gap-1 mb-2 flex-wrap">
-                                @if (checklist.IsPopular)
-                                {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.LocalFireDepartment">
-                                        Популярный
-                                    </MudChip>
-                                }
-                                @if (checklist.IsNew)
-                                {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.AutoAwesome">
-                                        Новый
-                                    </MudChip>
-                                }
-                            </div>
-
-                            <MudText Typo="Typo.body2" Class="text-muted card-description mb-3">
-                                @checklist.Description
-                            </MudText>
-
-                            @if (checklist.Chips.Any())
-                            {
-                                <div class="d-flex flex-wrap gap-1 mb-2">
-                                    @foreach (var chip in checklist.Chips.Take(3))
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
-                                            @chip
-                                        </MudChip>
-                                    }
-                                    @if (checklist.Chips.Count > 3)
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Text">
-                                            +@(checklist.Chips.Count - 3)
-                                        </MudChip>
-                                    }
-                                </div>
-                            }
-
-                            <div class="d-flex align-center gap-2 mb-1">
-                                <MudIcon Icon="@Icons.Material.Filled.ListAlt" Size="Size.Small" Class="text-muted" />
-                                <MudText Typo="Typo.caption" Class="text-muted">
-                                    @checklist.ItemsCount пунктов
-                                </MudText>
-                            </div>
-
-                            <div class="d-flex align-center gap-2 mb-1">
-                                <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Small" Class="text-muted" />
-                                <MudText Typo="Typo.caption" Class="text-muted">
-                                    Использован @checklist.UsageCount раз(а)
-                                </MudText>
-                            </div>
-
-                            <div class="d-flex align-center gap-2 mb-1">
-                                <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="text-muted" />
-                                <MudText Typo="Typo.caption" Class="text-muted">
-                                    @checklist.CreatedAtUtc.ToString("dd.MM.yyyy")
-                                </MudText>
-                            </div>
-                        </MudCardContent>
-
-                        <MudCardActions Class="border-top pa-2 gap-1">
-                            <MudButton StartIcon="@Icons.Material.Filled.Visibility"
-                                       Color="Color.Default"
-                                       Variant="Variant.Text"
-                                       Size="Size.Small"
-                                       OnClick="@(() => OpenPreviewDialog(checklist.Id))"
-                                       FullWidth>
-                                Пункты
-                            </MudButton>
-                            <MudButton StartIcon="@Icons.Material.Filled.PlayArrow"
-                                       Color="Color.Success"
-                                       Variant="Variant.Filled"
-                                       Size="Size.Small"
-                                       OnClick="@(() => StartChecklist(checklist.Id))"
-                                       FullWidth>
-                                Начать
-                            </MudButton>
-                        </MudCardActions>
-                    </MudCard>
+                    <ChecklistCard Checklist="@checklist"
+                                   OnPreviewRequested="OpenPreviewDialog"
+                                   OnStartRequested="StartChecklist" />
                 </MudItem>
             }
         </MudGrid>
@@ -420,6 +333,6 @@
             FullWidth = true,
             CloseOnEscapeKey = true
         };
-        DialogService.Show<PreviewChecklistDialog>("Пункты чек-листа", parameters, options);
+        await DialogService.ShowAsync<PreviewChecklistDialog>("Пункты чек-листа", parameters, options);
     }
 }

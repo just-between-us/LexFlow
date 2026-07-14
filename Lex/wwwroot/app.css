@@ -608,7 +608,7 @@ html {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* Admin Checklist */
+/* Базовые стили карточки чек-листа */
 .checklist-card {
     border-radius: 16px !important;
     border: 1px solid var(--mud-palette-lines-default);
@@ -617,9 +617,24 @@ html {
 }
 
 .checklist-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--nav-shadow) !important;
+    transform: translateY(-4px);;
     border-color: var(--legal-primary);
+}
+
+/* Свечения */
+.checklist-card-glow-popular:hover {
+    box-shadow: 0 0 20px rgba(255, 193, 7, 0.5) !important;
+    border-color: #ffc107;
+}
+
+.checklist-card-glow-new:hover {
+    box-shadow: 0 0 20px rgba(156, 39, 176, 0.5) !important;
+    border-color: #9c27b0;
+}
+
+.checklist-card-glow-new-popular:hover {
+    box-shadow: 0 0 20px rgba(156, 39, 176, 0.5), 0 0 20px rgba(255, 193, 7, 0.5) !important;
+    border-color: #9c27b0;
 }
 
 .empty-icon {
