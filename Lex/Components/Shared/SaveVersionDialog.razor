@@ -1,0 +1,70 @@
+﻿@using Lex.Domain.DTOs
+@using MudBlazor
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Сохранение версии</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex flex-column gap-3">
+            @if (!ForceNewVersion)
+            {
+                <MudRadioGroup @bind-Value="_createNewVersion" T="bool">
+                    <MudRadio Value="false" Color="Color.Primary">
+                        Обновить текущую версию (v@EditingVersionNumber)
+                    </MudRadio>
+                    <MudRadio Value="true" Color="Color.Primary">
+                        Создать новую версию (v@(EditingVersionNumber + 1))
+                    </MudRadio>
+                </MudRadioGroup>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-2">
+                    Будет создана новая версия документа.
+                </MudAlert>
+            }
+            <MudTextField @bind-Value="_changeSummary"
+                          Label="Описание изменений (ChangeSummary)"
+                          Lines="2"
+                          T="string"
+                          Placeholder="Необязательно" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Отмена</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit">Сохранить</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public int EditingVersionNumber { get; set; }
+    [Parameter] public bool IsLatestVersion { get; set; }
+    [Parameter] public bool HasDocumentFieldChanges { get; set; }
+    [Parameter] public bool ForceNewVersion { get; set; } = false;
+
+    private bool _createNewVersion = false;
+    private string? _changeSummary;
+
+    protected override void OnParametersSet()
+    {
+        if (ForceNewVersion) _createNewVersion = true;
+        else if (!IsLatestVersion) // Для старых версий по умолчанию предлагать новую
+            _createNewVersion = true;
+        else
+            _createNewVersion = HasDocumentFieldChanges; // Если изменились поля, лучше новую версию
+    }
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private void Submit()
+    {
+        MudDialog.Close(DialogResult.Ok(new SaveVersionResult
+        {
+            CreateNewVersion = _createNewVersion || ForceNewVersion,
+            ChangeSummary = _changeSummary
+        }));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

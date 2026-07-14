@@ -1,0 +1,374 @@
+﻿@page "/documents/{id:guid}/edit"
+@attribute [Authorize]
+@using Lex.Domain.Entities
+@using Lex.Domain.Enums
+@using Lex.Infrastructure.Repositories
+@using Lex.Components.Auth
+@using Lex.Components.Shared
+@using Lex.Components.Utils
+@using Lex.Domain.DTOs
+@using Microsoft.AspNetCore.Authorization
+@using Markdig
+@inject DocumentRepository DocumentRepo
+@inject DocumentVersionRepository VersionRepo
+@inject UserContext UserContext
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+@inject IDocumentHelperService DocumentHelper
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-8">
+    @if (_isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-8" />
+    }
+    else if (_document == null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            Документ не найден или у вас нет прав на редактирование.
+        </MudAlert>
+    }
+    else
+    {
+        <!-- Заголовок -->
+        <div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
+            <div>
+                <MudText Typo="Typo.h4">Редактирование: @_document.Title</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    @DocumentHelper.GetStatusDisplayName(_document.Status) · 
+                    @DocumentHelper.GetTypeDisplayName(_document.Type) · 
+                    Текущая версия: v.@_document.CurrentVersionNumber
+                    @if (_hasUnsavedChanges)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Warning" Class="ml-2">
+                            Несохранённые изменения
+                        </MudChip>
+                    }
+                </MudText>
+                @if (_document.TemplateId != null)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                        <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Size="Size.Small" Class="mr-1" />
+                        <a href="@($"/templates/view/{_document.TemplateId}")" class="text-primary">Перейти к шаблону</a>
+                    </MudText>
+                }
+            </div>
+            <div class="d-flex gap-2">
+                <MudButton Variant="Variant.Text" Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.Visibility"
+                           Href="@($"/documents/{Id}")">
+                    Просмотр
+                </MudButton>
+                <MudTooltip Text="История версий">
+                    <MudIconButton Icon="@Icons.Material.Filled.History"
+                                   Color="Color.Inherit"
+                                   OnClick="@ToggleVersionPanel" />
+                </MudTooltip>
+            </div>
+        </div>
+
+        <!-- Редактор и предпросмотр -->
+        <EditForm Model="@_document" OnValidSubmit="Save">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="1" Class="mb-4">
+                        <MudCardContent>
+                            <MudTextField @bind-Value="_editTitle" Label="Название"
+                                          For="@(() => _document.Title)" Required="true"
+                                          T="string" Class="mb-3" Immediate="true"
+                                          OnKeyUp="(e) => MarkChanged(e)" />
+                            <MudTextField @bind-Value="_editDescription" Label="Описание"
+                                          Lines="2" T="string" Class="mb-3" Immediate="true"
+                                          OnKeyUp="(e) => MarkChanged(e)" />
+                            <MudSelect @bind-Value="_editType" Label="Тип" T="DocumentType" Class="mb-3">
+                                @foreach (var type in Enum.GetValues<DocumentType>())
+                                {
+                                    <MudSelectItem Value="type">@DocumentHelper.GetTypeDisplayName(type)</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudSelect @bind-Value="_editPrivacy" Label="Видимость" T="DocumentPrivacy" Class="mb-3">
+                                @foreach (var p in Enum.GetValues<DocumentPrivacy>())
+                                {
+                                    <MudSelectItem Value="p">@DocumentHelper.GetPrivacyDisplayName(p)</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudTextField @bind-Value="_editContent" Label="Содержимое (Markdown)"
+                                          Lines="15" T="string" Immediate="true"
+                                          OnKeyUp="(e) => { MarkChanged(e); UpdatePreview(); }" />
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="1" Class="h-100">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">Предпросмотр</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent Class="markdown-preview">
+                            @if (string.IsNullOrWhiteSpace(_editContent))
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Начните вводить текст...</MudText>
+                            }
+                            else
+                            {
+                                @((MarkupString)RenderMarkdown(_editContent))
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Кнопки сохранения -->
+            <div class="d-flex flex-wrap gap-2 justify-space-between mt-4">
+                <div class="d-flex gap-2">
+                    <MudTooltip Text="Сохранить изменения (выбор стратегии)">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   ButtonType="ButtonType.Submit"
+                                   StartIcon="@Icons.Material.Filled.Save"
+                                   Disabled="@(!_hasUnsavedChanges)">
+                            Сохранить
+                        </MudButton>
+                    </MudTooltip>
+                    <MudTooltip Text="Создать новую версию на основе текущей">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   OnClick="SaveAsNewVersion"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   Disabled="@(!_hasUnsavedChanges)">
+                            Сохранить как новую версию
+                        </MudButton>
+                    </MudTooltip>
+                </div>
+                <MudTooltip Text="Отменить редактирование и вернуться к просмотру">
+                    <MudButton Variant="Variant.Text" Color="Color.Secondary"
+                               OnClick="Cancel">
+                        Отмена
+                    </MudButton>
+                </MudTooltip>
+            </div>
+        </EditForm>
+    }
+</MudContainer>
+
+<!-- Абсолютная панель выбора версий -->
+@if (_versionPanelVisible)
+{
+    <div class="version-panel-overlay" @onclick="CloseVersionPanel">
+        <div class="version-panel" @onclick:stopPropagation="true">
+            <div class="d-flex align-center justify-space-between pa-3 border-bottom">
+                <MudText Typo="Typo.h6">История версий</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@CloseVersionPanel" Size="Size.Small"/>
+            </div>
+            <div class="version-list-container px-2 py-2">
+                <MudList T="DocumentVersion">
+                    @foreach (var version in _versions)
+                    {
+                        <MudListItem Text="@($"v{version.VersionNumber} — {version.VersionCreatedByUser?.GetFullName() ?? "Неизвестный"}")"
+                                     SecondaryText="@version.CreatedAtUtc.ToString("g")"
+                                     Icon="@(version == _editingVersion ? Icons.Material.Filled.Edit : Icons.Material.Filled.Circle)"
+                                     OnClick="@(() => SelectVersion(version))"
+                                     Class="@(version == _editingVersion ? "active-version" : "")" />
+                    }
+                </MudList>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Document? _document;
+    private List<DocumentVersion> _versions = new();
+    private DocumentVersion? _editingVersion;
+    private bool _isLoading = true;
+    private bool _hasUnsavedChanges = false;
+    private bool _versionPanelVisible = false;
+    private Guid? _currentUserId;
+
+    private string _editTitle = "";
+    private string _editDescription = "";
+    private DocumentType _editType;
+    private DocumentPrivacy _editPrivacy;
+    private string _editContent = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentUserId = Guid.TryParse(UserContext.CurrentUser?.UserId, out var uid) ? uid : null;
+        if (!_currentUserId.HasValue) { _isLoading = false; return; }
+        await LoadDocument();
+    }
+
+    private async Task LoadDocument()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            _document = await DocumentRepo.GetDocumentWithDetailsAsync(Id);
+            if (_document == null || _document.IsDeleted) { _document = null; return; }
+
+            bool canEdit = _document.CreatedByUserId == _currentUserId ||
+                           _document.Editors.Any(e => e.Id == _currentUserId);
+            if (!canEdit) { _document = null; return; }
+
+            _versions = _document.Versions.OrderByDescending(v => v.VersionNumber).ToList();
+            var latest = _versions.FirstOrDefault(v => v.VersionNumber == _document.CurrentVersionNumber);
+            _editingVersion = latest ?? _versions.FirstOrDefault();
+            if (_editingVersion != null)
+            {
+                _editContent = _editingVersion.Content;
+            }
+            _editTitle = _document.Title;
+            _editDescription = _document.Description;
+            _editType = _document.Type;
+            _editPrivacy = _document.Privacy;
+            _hasUnsavedChanges = false;
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void MarkChanged(KeyboardEventArgs e) => MarkChanged();
+    private void MarkChanged() { _hasUnsavedChanges = true; }
+    private void UpdatePreview() => StateHasChanged();
+
+    private void SelectVersion(DocumentVersion version)
+    {
+        if (_hasUnsavedChanges)
+        {
+            // Можно спросить подтверждение, но для простоты сбрасываем
+            _hasUnsavedChanges = false;
+        }
+        _editingVersion = version;
+        _editContent = version.Content;
+        // Поля документа не меняются, только контент
+        StateHasChanged();
+    }
+
+    private void ToggleVersionPanel() => _versionPanelVisible = !_versionPanelVisible;
+    private void CloseVersionPanel() => _versionPanelVisible = false;
+
+    private async Task Save()
+    {
+        if (!_hasUnsavedChanges) return;
+        // Показать диалог с выбором стратегии
+        var parameters = new DialogParameters<SaveVersionDialog>
+        {
+            { x => x.EditingVersionNumber, _editingVersion?.VersionNumber ?? 0 },
+            { x => x.IsLatestVersion, _editingVersion?.VersionNumber == _document?.CurrentVersionNumber },
+            { x => x.HasDocumentFieldChanges, HasDocumentFieldChanges() }
+        };
+        var dialog = await DialogService.ShowAsync<SaveVersionDialog>("Сохранение версии", parameters);
+        var result = await dialog.Result;
+        if (result.Canceled) return;
+
+        var saveResult = result.Data as SaveVersionResult;
+        if (saveResult == null) return;
+
+        if (saveResult.CreateNewVersion)
+        {
+            await CreateNewVersion(saveResult.ChangeSummary, _editContent);
+        }
+        else
+        {
+            await UpdateExistingVersion(saveResult.ChangeSummary, _editContent);
+        }
+    }
+
+    private async Task SaveAsNewVersion()
+    {
+        var parameters = new DialogParameters<SaveVersionDialog>
+        {
+            { x => x.EditingVersionNumber, _editingVersion?.VersionNumber ?? 0 },
+            { x => x.IsLatestVersion, _editingVersion?.VersionNumber == _document?.CurrentVersionNumber },
+            { x => x.HasDocumentFieldChanges, HasDocumentFieldChanges() },
+            { x => x.ForceNewVersion, true } // предвыбрано создание новой
+        };
+        var dialog = DialogService.Show<SaveVersionDialog>("Сохранение версии", parameters);
+        var result = await dialog.Result;
+        if (result.Canceled) return;
+
+        var saveResult = result.Data as SaveVersionResult;
+        if (saveResult != null && saveResult.CreateNewVersion)
+        {
+            await CreateNewVersion(saveResult.ChangeSummary, _editContent);
+        }
+        else
+        {
+            Snackbar.Add("Неверный выбор", Severity.Warning);
+        }
+    }
+
+    private async Task CreateNewVersion(string? changeSummary, string content)
+    {
+        if (_document == null) return;
+        var newVersion = new DocumentVersion
+        {
+            Id = Guid.NewGuid(),
+            DocumentId = _document.Id,
+            VersionNumber = _document.CurrentVersionNumber + 1,
+            Content = content,
+            ChangeSummary = changeSummary ?? $"Создана на основе версии {_editingVersion?.VersionNumber}",
+            VersionCreatedByUserId = _currentUserId,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        // Обновляем поля документа, если были изменения
+        if (HasDocumentFieldChanges())
+        {
+            _document.Title = _editTitle;
+            _document.Description = _editDescription;
+            _document.Type = _editType;
+            _document.Privacy = _editPrivacy;
+        }
+
+        await DocumentRepo.AddDocumentVersionAsync(newVersion);
+        Snackbar.Add($"Создана новая версия v{newVersion.VersionNumber}", Severity.Success);
+        _hasUnsavedChanges = false;
+        await LoadDocument();
+    }
+
+    private async Task UpdateExistingVersion(string? changeSummary, string content)
+    {
+        if (_editingVersion == null || _document == null) return;
+        _editingVersion.Content = content;
+        _editingVersion.ChangeSummary = changeSummary;
+        _editingVersion.UpdatedAtUtc = DateTime.UtcNow;
+
+        // Если это текущая версия и изменились поля документа, обновляем и их
+        if (_editingVersion.VersionNumber == _document.CurrentVersionNumber && HasDocumentFieldChanges())
+        {
+            _document.Title = _editTitle;
+            _document.Description = _editDescription;
+            _document.Type = _editType;
+            _document.Privacy = _editPrivacy;
+            _document.UpdatedAtUtc = DateTime.UtcNow;
+            await DocumentRepo.UpdateAsync(_document);
+        }
+
+        await VersionRepo.UpdateVersionAsync(_editingVersion);
+        Snackbar.Add($"Версия v{_editingVersion.VersionNumber} обновлена", Severity.Success);
+        _hasUnsavedChanges = false;
+        await LoadDocument();
+    }
+
+    private bool HasDocumentFieldChanges() =>
+        _document != null &&
+        (_editTitle != _document.Title ||
+         _editDescription != _document.Description ||
+         _editType != _document.Type ||
+         _editPrivacy != _document.Privacy);
+
+    private void Cancel() => Navigation.NavigateTo($"/documents/{Id}");
+
+    private static string RenderMarkdown(string markdown)
+    {
+        var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+        return Markdown.ToHtml(markdown ?? string.Empty, pipeline);
+    }
+}

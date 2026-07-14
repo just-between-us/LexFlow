@@ -9,7 +9,12 @@ public class DocumentVersionRepository : Repository<DocumentVersion>
     public DocumentVersionRepository(AppDbContext context) : base(context)
     {
     }
-
+    public async Task UpdateVersionAsync(DocumentVersion version, CancellationToken cancellationToken = default)
+    {
+        version.UpdatedAtUtc = DateTime.UtcNow;
+        _dbSet.Update(version);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
     /// Получить все версии документа
     public virtual async Task<IReadOnlyList<DocumentVersion>> GetVersionsForDocumentAsync(
         Guid documentId,
