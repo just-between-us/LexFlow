@@ -10,7 +10,7 @@
             {
                 <MudRadioGroup @bind-Value="_createNewVersion" T="bool">
                     <MudRadio Value="false" Color="Color.Primary">
-                        Обновить текущую версию (v@EditingVersionNumber)
+                        Обновить текущую версию (v@(EditingVersionNumber))
                     </MudRadio>
                     <MudRadio Value="true" Color="Color.Primary">
                         Создать новую версию (v@(EditingVersionNumber + 1))

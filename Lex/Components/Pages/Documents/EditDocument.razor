@@ -80,18 +80,25 @@
                             <MudTextField @bind-Value="_editDescription" Label="Описание"
                                           Lines="2" T="string" Class="mb-3" Immediate="true"
                                           OnKeyUp="(e) => MarkChanged(e)" />
-                            <MudSelect @bind-Value="_editType" Label="Тип" T="DocumentType" Class="mb-3">
+                            
+                            <MudSelect Value="_editType" 
+                                       ValueChanged="(v) => { _editType = v; MarkChanged(); }" 
+                                       Label="Тип" T="DocumentType" Class="mb-3">
                                 @foreach (var type in Enum.GetValues<DocumentType>())
                                 {
                                     <MudSelectItem Value="type">@DocumentHelper.GetTypeDisplayName(type)</MudSelectItem>
                                 }
                             </MudSelect>
-                            <MudSelect @bind-Value="_editPrivacy" Label="Видимость" T="DocumentPrivacy" Class="mb-3">
+
+                            <MudSelect Value="_editPrivacy" 
+                                       ValueChanged="(v) => { _editPrivacy = v; MarkChanged(); }" 
+                                       Label="Видимость" T="DocumentPrivacy" Class="mb-3">
                                 @foreach (var p in Enum.GetValues<DocumentPrivacy>())
                                 {
                                     <MudSelectItem Value="p">@DocumentHelper.GetPrivacyDisplayName(p)</MudSelectItem>
                                 }
                             </MudSelect>
+                            
                             <MudTextField @bind-Value="_editContent" Label="Содержимое (Markdown)"
                                           Lines="15" T="string" Immediate="true"
                                           OnKeyUp="(e) => { MarkChanged(e); UpdatePreview(); }" />
