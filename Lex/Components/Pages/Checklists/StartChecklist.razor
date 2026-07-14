@@ -1,0 +1,256 @@
+﻿@page "/checklists/start/{id:guid}"
+@attribute [Authorize]
+@using Lex.Domain.Entities
+@using Lex.Infrastructure.Repositories
+@using Lex.Components.Auth
+@using Lex.Infrastructure.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@inject ChecklistRepository ChecklistRepo
+@inject AppDbContext DbContext
+@inject UserContext UserContext
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    @if (_isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-8" />
+    }
+    else if (_activeChecklist == null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            Не удалось загрузить чек-лист.
+        </MudAlert>
+    }
+    else if (!_hasAccess)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            У вас нет доступа к этому чек-листу.
+        </MudAlert>
+    }
+    else
+    {
+        <div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
+            <div>
+                <MudText Typo="Typo.h4">@_activeChecklist.Checklist?.Title</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    @_activeChecklist.Checklist?.Description
+                </MudText>
+                @if (_activeChecklist.ClientOrganization != null)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text" Class="mt-2">
+                        Привязан к организации: @_activeChecklist.ClientOrganization.Name
+                    </MudChip>
+                }
+            </div>
+            <div class="d-flex gap-2">
+                <MudTooltip Text="Управление доступом">
+                    <MudIconButton Icon="@Icons.Material.Filled.GroupAdd" 
+                                   Color="Color.Inherit" 
+                                   OnClick="@(() => _drawerOpen = !_drawerOpen)" />
+                </MudTooltip>
+                <MudButton Variant="Variant.Text" Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.ArrowBack"
+                           OnClick="@GoBack">
+                    К каталогу
+                </MudButton>
+            </div>
+        </div>
+
+        <!-- Прогресс -->
+        <MudPaper Class="pa-4 mb-6 progress-panel" Elevation="0">
+            <div class="d-flex align-center gap-4">
+                <MudText Typo="Typo.subtitle1" Class="flex-shrink-0">Прогресс</MudText>
+                <div class="flex-grow-1">
+                    <MudProgressLinear Value="@_progress" 
+                                       Color="@(_progress == 100 ? Color.Success : Color.Primary)" 
+                                       Class="styled-progress" />
+                </div>
+                <MudText Typo="Typo.h6" Class="flex-shrink-0">@_progress.ToString("F0")%</MudText>
+            </div>
+        </MudPaper>
+        
+        <!-- Список шагов -->
+        <MudList T="ActiveChecklistItem">
+            @foreach (var item in _activeChecklist.Items.OrderBy(i => i.Order))
+            {
+                <MudListItem T="ActiveChecklistItem" Class="checklist-step">
+                    <div class="d-flex flex-column w-100 gap-2">
+                        <div class="d-flex align-center gap-3">
+                            <MudCheckBox @bind-Value="item.IsCompleted" 
+                                         Color="Color.Primary"
+                                         CheckedChanged="(value) => OnItemChanged(item)" />
+                            <MudText Typo="Typo.body1" Class="@(item.IsCompleted ? "completed-text" : "")">
+                                @item.Title
+                            </MudText>
+                        </div>
+                        <MudTextField @bind-Value="item.Note"
+                                      Label="Заметка"
+                                      Variant="Variant.Outlined"
+                                      Lines="2"
+                                      T="string"
+                                      Immediate="true"
+                                      OnKeyUp="(e) => OnItemNoteChanged(item)" />
+                    </div>
+                </MudListItem>
+            }
+        </MudList>
+        
+        <!-- Анимация завершения -->
+        if (_progress == 100)
+        {
+            <MudPaper Class="pa-8 mb-6 text-center completion-banner" Elevation="0">
+                <MudIcon Icon="@Icons.Material.Filled.Celebration" Size="Size.Large" Color="Color.Success" Class="mb-2" />
+                <MudText Typo="Typo.body1" Color="Color.Success">Поздравляем! Чек-лист полностью пройден.</MudText>
+            </MudPaper>
+        }
+    }
+</MudContainer>
+
+<!-- Боковая панель управления доступом -->
+<MudDrawer @bind-Open="_drawerOpen" Anchor="Anchor.End" Width="350px" Elevation="2">
+    <MudContainer Class="py-4">
+        <div class="d-flex align-center justify-space-between mb-4">
+            <MudText Typo="Typo.h6">Управление доступом</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@(() => _drawerOpen = false)" />
+        </div>
+
+        <MudText Typo="Typo.subtitle2" Class="mb-2">Редакторы</MudText>
+        <MudList T="User">
+            @foreach (var editor in _editors)
+            {
+                <MudListItem T="User" Class="editor-item">
+                    <div class="d-flex align-center w-100">
+                        <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" />
+                        <MudText>@editor.GetFullName()</MudText>
+                        <MudSpacer />
+                        @if (_canManageAccess)
+                        {
+                            <MudTooltip Text="Удалить доступ">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                               Size="Size.Small" Color="Color.Error"
+                                               OnClick="@(() => RemoveEditor(editor.Id))" />
+                            </MudTooltip>
+                        }
+                    </div>
+                </MudListItem>
+            }
+        </MudList>
+
+        @if (_canManageAccess)
+        {
+            <MudDivider Class="my-3" />
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Привязка к организации</MudText>
+            @if (_activeChecklist?.ClientOrganization != null)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">
+                    @_activeChecklist.ClientOrganization.Name
+                </MudChip>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Не привязано</MudText>
+            }
+        }
+    </MudContainer>
+</MudDrawer>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private ActiveChecklist? _activeChecklist;
+    private List<User> _editors = new();
+    private bool _isLoading = true;
+    private bool _hasAccess = true;
+    private bool _canManageAccess = false;
+    private bool _drawerOpen = false;
+    private Guid? _currentUserId;
+
+    private double _progress => _activeChecklist?.Items?.Count > 0
+        ? (double)_activeChecklist.Items.Count(i => i.IsCompleted) / _activeChecklist.Items.Count * 100
+        : 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentUserId = Guid.TryParse(UserContext.CurrentUser?.UserId, out var uid) ? uid : null;
+        if (!_currentUserId.HasValue)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        try
+        {
+            _activeChecklist = await ChecklistRepo.GetOrCreateActiveChecklistAsync(Id, _currentUserId.Value);
+            await DbContext.Entry(_activeChecklist)
+                .Collection(ac => ac.Editors)
+                .LoadAsync();
+            await DbContext.Entry(_activeChecklist)
+                .Reference(ac => ac.ClientOrganization)
+                .LoadAsync();
+
+            _editors = _activeChecklist.Editors.ToList();
+
+            // Проверка прав: автор, редактор или член организации
+            _hasAccess = _activeChecklist.UserId == _currentUserId ||
+                         _editors.Any(e => e.Id == _currentUserId) ||
+                         (_activeChecklist.ClientOrganizationId != null && 
+                          await IsUserInOrganization(_currentUserId.Value, _activeChecklist.ClientOrganizationId.Value));
+            
+            _canManageAccess = _activeChecklist.UserId == _currentUserId || UserContext.IsAdmin;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка загрузки: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task<bool> IsUserInOrganization(Guid userId, Guid orgId)
+    {
+        return await DbContext.Users.AnyAsync(u => u.Id == userId && u.ClientOrganizationId == orgId);
+    }
+
+    private async Task OnItemNoteChanged(ActiveChecklistItem item)
+    {
+        await SaveItem(item);
+    }
+
+    private async Task SaveItem(ActiveChecklistItem item)
+    {
+        try
+        {
+            await ChecklistRepo.SaveActiveChecklistItemAsync(item);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка сохранения: {ex.Message}", Severity.Error);
+        }
+        StateHasChanged();
+    }
+
+    private async Task RemoveEditor(Guid editorId)
+    {
+        if (_activeChecklist == null || !_canManageAccess) return;
+        var editor = _editors.FirstOrDefault(e => e.Id == editorId);
+        if (editor == null) return;
+
+        try
+        {
+            _activeChecklist.Editors.Remove(editor);
+            _editors.Remove(editor);
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add($"Доступ редактора {editor.GetFullName()} удалён", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/checklists/templates");
+}

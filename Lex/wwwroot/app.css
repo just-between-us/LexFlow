@@ -636,6 +636,21 @@ html {
     box-shadow: 0 0 20px rgba(156, 39, 176, 0.5), 0 0 20px rgba(255, 193, 7, 0.5) !important;
     border-color: #9c27b0;
 }
+.checklist-step {
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    padding: 12px !important;
+    transition: box-shadow 0.2s ease;
+}
+
+.checklist-step:hover {
+    box-shadow: var(--nav-shadow);
+}
+
+.text-decoration-line-through {
+    text-decoration: line-through;
+}
 
 .empty-icon {
     font-size: 64px !important;
@@ -1099,4 +1114,28 @@ html {
 @keyframes slideInRight {
     from { transform: translateX(100%); }
     to { transform: translateX(0); }
+}
+
+.styled-progress {
+    height: 12px;
+    border-radius: 6px;
+    background: var(--mud-palette-background-grey);
+}
+.styled-progress .mud-progress-linear-bar {
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--mud-palette-primary), var(--mud-palette-secondary));
+}
+.completion-banner {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.2));
+    border: 1px solid var(--mud-palette-success);
+    border-radius: 16px;
+    animation: fadeInScale 0.5s ease-out;
+}
+.completed-text {
+    text-decoration: line-through;
+    color: var(--mud-palette-text-secondary);
+}
+@keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
 }
