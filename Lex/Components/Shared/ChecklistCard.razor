@@ -1,4 +1,5 @@
-﻿@using Lex.Domain.DTOs
+﻿@using Lex.Components.Utils
+@using Lex.Domain.DTOs
 
 
 <MudCard Elevation="1" Class="@CardClasses">
@@ -8,7 +9,7 @@
                 <MudIcon Icon="@Icons.Material.Filled.Checklist" Color="Color.Primary" Class="flex-shrink-0" />
                 <MudTooltip Text="@Checklist.Title" Arrow="true" Placement="Placement.Top">
                     <MudText Typo="Typo.h6" Class="card-title mud-text-truncate" Style="width: 100%;">
-                        @Checklist.Title
+                        @StringHelper.Truncate(Checklist.Title, 26)
                     </MudText>
                 </MudTooltip>
             </div>
@@ -30,7 +31,7 @@
         </div>
 
         <MudText Typo="Typo.body2" Class="text-muted mb-3">
-            @Checklist.Description
+            @StringHelper.Truncate(Checklist.Description, 70)
         </MudText>
 
         @if (Checklist.Chips.Any())
@@ -83,7 +84,7 @@
             Пункты
         </MudButton>
         <MudButton StartIcon="@Icons.Material.Filled.PlayArrow"
-                   Color="Color.Success"
+                   Color="Color.Primary"
                    Variant="Variant.Filled"
                    Size="Size.Small"
                    OnClick="@(() => StartChecklist(Checklist.Id))"

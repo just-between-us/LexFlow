@@ -10,9 +10,12 @@
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
-    <MudText Typo="Typo.h3" Class="mb-2">Мои активные чек-листы</MudText>
-    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+<div class="py-4">
+    <PageTitle>Мои активные чек-листы</PageTitle>
+</div>
+
+    <MudText Typo="Typo.h4" Class="mb-2">Мои активные чек-листы</MudText>
+    <MudText Typo="Typo.body2" Class="text-muted">
         Продолжайте прохождение или просматривайте завершённые
     </MudText>
 
@@ -118,7 +121,6 @@
             </MudGrid>
         }
     }
-</MudContainer>
 
 @code {
     private List<ActiveChecklist> _activeChecklists = new();
