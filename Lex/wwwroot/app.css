@@ -1007,6 +1007,16 @@ html {
     transition: opacity 0.2s ease 0s, right 0.2s ease 0s;
 }
 
+.checklist-item {
+    border: 1px solid var(--mud-palette-lines-default);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.checklist-item-done {
+    border: 1px solid var(--mud-palette-success);
+    background-color: rgba(var(--mud-palette-success-rgb), 0.06);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
 .toolbar-panel {
     background: var(--mud-palette-background-grey);
     border: 1px solid var(--mud-palette-lines-default);

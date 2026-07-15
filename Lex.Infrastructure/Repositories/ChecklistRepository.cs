@@ -59,18 +59,4 @@ public class ChecklistRepository : Repository<Checklist>
 
         return active;
     }
-    public virtual async Task<Dictionary<Guid, int>> GetUsageCountsAsync(
-        IEnumerable<Guid> checklistIds,
-        CancellationToken cancellationToken = default)
-    {
-        var ids = checklistIds.Distinct().ToList();
-        if (!ids.Any())
-            return new Dictionary<Guid, int>();
-
-        return await _context.ActiveChecklists
-            .Where(a => !a.IsDeleted && ids.Contains(a.ChecklistId))
-            .GroupBy(a => a.ChecklistId)
-            .Select(g => new { ChecklistId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.ChecklistId, x => x.Count, cancellationToken);
-    }
 }

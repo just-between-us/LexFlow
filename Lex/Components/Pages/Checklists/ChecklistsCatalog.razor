@@ -312,8 +312,10 @@
 
     private void StartChecklist(Guid id)
     {
-        NavigationManager.NavigateTo($"/checklists/start/{id}");
+        Console.WriteLine($"StartChecklist {id}");
+        NavigationManager.NavigateTo($"/checklists/start?templateId={id}");
     }
+        
 
     private async Task OpenPreviewDialog(Guid checklistId)
     {

@@ -1,0 +1,192 @@
+﻿@page "/checklists/active/{ActiveChecklistId:guid}"
+@using Lex.Domain.DTOs
+@using Lex.Domain.Interfaces
+@inject IActiveChecklistService ActiveChecklistService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_details?.ChecklistTitle ?? "Прохождение чек-листа")</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-center pa-8">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+    </div>
+}
+else if (_details is null)
+{
+    <MudPaper Class="pa-8 rounded-lg text-center" Elevation="0" Style="background: var(--mud-palette-background-grey);">
+        <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Large" Class="mb-2 text-muted" />
+        <MudText Typo="Typo.h6" Class="mb-1">Чек-лист не найден</MudText>
+        <MudText Typo="Typo.body2" Class="text-muted mb-3">
+            Возможно, он был удалён
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="@(() => NavigationManager.NavigateTo("/checklists/templates"))">
+            Вернуться в каталог
+        </MudButton>
+    </MudPaper>
+}
+else
+{
+    <div class="py-4">
+        <MudButton Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="@(() => NavigationManager.NavigateTo("/checklists/templates"))"
+                   Class="mb-2">
+            К каталогу
+        </MudButton>
+
+        <div class="d-flex align-start justify-space-between flex-wrap gap-3 mb-2">
+            <div>
+                <MudText Typo="Typo.h4">@_details.ChecklistTitle</MudText>
+                @if (!string.IsNullOrWhiteSpace(_details.ChecklistDescription))
+                {
+                    <MudText Typo="Typo.body2" Class="text-muted mt-1" Style="max-width: 640px;">
+                        @_details.ChecklistDescription
+                    </MudText>
+                }
+            </div>
+
+            <MudMenu Icon="@Icons.Material.Filled.MoreVert" AnchorOrigin="Origin.BottomRight">
+                <MudMenuItem OnClick="@DeleteProgress" IconColor="Color.Error" Icon="@Icons.Material.Filled.DeleteOutline">
+                    Удалить прогресс
+                </MudMenuItem>
+            </MudMenu>
+        </div>
+    </div>
+
+    <MudPaper Class="pa-4 mb-4 rounded-lg toolbar-panel" Elevation="0">
+        <div class="d-flex align-center gap-4 flex-wrap">
+            <MudProgressCircular Color="@(_progressPercent == 100 ? Color.Success : Color.Primary)"
+                                  Value="@_progressPercent"
+                                  Size="Size.Large"
+                                  StrokeWidth="6">
+                <MudText Typo="Typo.body2">@($"{_progressPercent:0}%")</MudText>
+            </MudProgressCircular>
+            <div>
+                <MudText Typo="Typo.body1">
+                    Выполнено @_completedCount из @_details.Items.Count
+                </MudText>
+                <MudText Typo="Typo.caption" Class="text-muted">
+                    Начато @_details.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                </MudText>
+            </div>
+            @if (_progressPercent == 100)
+            {
+                <MudChip T="string" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">
+                    Готово
+                </MudChip>
+            }
+        </div>
+    </MudPaper>
+
+    <MudStack Spacing="2">
+        @foreach (var item in _details.Items.OrderBy(i => i.Order))
+        {
+            <MudPaper Class="@GetItemClass(item)" Elevation="0">
+                <div class="d-flex align-start gap-2 pa-3">
+                    <MudCheckBox T="bool"
+                                 Value="@item.IsCompleted"
+                                 ValueChanged="@(v => OnToggle(item, v))"
+                                 Color="Color.Success"
+                                 Class="mt-n1" />
+
+                    <div class="flex-grow-1">
+                        <MudText Typo="Typo.subtitle1"
+                                  Style="@(item.IsCompleted ? "text-decoration: line-through; opacity: 0.6;" : "")">
+                            @item.Title
+                        </MudText>
+
+                        <MudButton Size="Size.Small"
+                                   Variant="Variant.Text"
+                                   StartIcon="@(_expandedItemId == item.Id ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                                   OnClick="@(() => ToggleExpand(item.Id))"
+                                   Class="px-1 mt-1">
+                            @(string.IsNullOrWhiteSpace(item.Note) ? "Добавить заметку" : "Заметка")
+                        </MudButton>
+
+                        <MudCollapse Expanded="@(_expandedItemId == item.Id)">
+                            <MudTextField T="string"
+                                          Value="@item.Note"
+                                          ValueChanged="@(v => OnNoteChanged(item, v))"
+                                          Placeholder="Комментарий к этому пункту..."
+                                          Variant="Variant.Outlined"
+                                          Lines="2"
+                                          Immediate="true"
+                                          DebounceInterval="600"
+                                          OnDebounceIntervalElapsed="@(v => SaveNote(item, v))"
+                                          Class="mt-1" />
+                        </MudCollapse>
+                    </div>
+                </div>
+            </MudPaper>
+        }
+    </MudStack>
+}
+
+@code {
+    [Parameter] public Guid ActiveChecklistId { get; set; }
+
+    private ActiveChecklistDetailsDto? _details;
+    private bool _isLoading = true;
+    private Guid? _expandedItemId;
+
+    private int _completedCount => _details?.Items.Count(i => i.IsCompleted) ?? 0;
+    private double _progressPercent => _details is { Items.Count: > 0 }
+        ? Math.Round(100.0 * _completedCount / _details.Items.Count, 0)
+        : 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        _details = await ActiveChecklistService.GetDetailsAsync(ActiveChecklistId);
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private void ToggleExpand(Guid itemId)
+        => _expandedItemId = _expandedItemId == itemId ? null : itemId;
+
+    private async Task OnToggle(ActiveChecklistItemDto item, bool value)
+    {
+        item.IsCompleted = value;
+        await ActiveChecklistService.ToggleItemAsync(item.Id, value);
+        StateHasChanged();
+    }
+
+    private void OnNoteChanged(ActiveChecklistItemDto item, string value)
+        => item.Note = value;
+
+    private async Task SaveNote(string value, ActiveChecklistItemDto item)
+        => await ActiveChecklistService.UpdateNoteAsync(item.Id, value);
+
+    private Task SaveNote(ActiveChecklistItemDto item, string value)
+        => ActiveChecklistService.UpdateNoteAsync(item.Id, value);
+
+    private string GetItemClass(ActiveChecklistItemDto item) =>
+        item.IsCompleted
+            ? "rounded-lg checklist-item-done"
+            : "rounded-lg checklist-item";
+
+    private async Task DeleteProgress()
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Удалить прогресс?",
+            "Весь прогресс по этому чек-листу будет скрыт. Вы сможете восстановить его при повторном запуске.",
+            yesText: "Удалить", cancelText: "Отмена");
+
+        if (confirmed != true) return;
+
+        await ActiveChecklistService.DeleteAsync(ActiveChecklistId);
+        Snackbar.Add("Прогресс удалён", Severity.Info);
+        NavigationManager.NavigateTo("/checklists/templates");
+    }
+}
