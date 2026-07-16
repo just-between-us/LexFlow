@@ -96,47 +96,50 @@
     
     
     <div class="nav-footer">
-        
         @if (UserContext.IsAuthenticated)
         {
             var user = UserContext.CurrentUser;
-            <div class="user-profile-footer @(_isLoggingOut ? "logging-out" : "")">
-                <MudAvatar Class="user-avatar" Color="Color.Primary" Size="Size.Small">
-                    @if (!string.IsNullOrEmpty(user?.Initials))
-                    {
-                        <MudText>@user.Initials</MudText>
-                    }
-                    else
-                    {
-                        <MudIcon Icon="@Icons.Material.Filled.Person" Class="user-avatar-icon"/>
-                    }
-                </MudAvatar>
-                <div class="user-info">
-                    <MudText Class="user-name">@(user?.FullName ?? "Пользователь")</MudText>
-                    <MudText Class="user-email">@user?.Email</MudText>
+            <a href="/profile">
+                <div class="user-profile-footer @(_isLoggingOut ? "logging-out" : "")">
+                    <MudAvatar Class="user-avatar" Color="Color.Primary" Size="Size.Small">
+                        @if (!string.IsNullOrEmpty(user?.Initials))
+                        {
+                            <MudText>@user.Initials</MudText>
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Class="user-avatar-icon"/>
+                        }
+                    </MudAvatar>
+                    <div class="user-info">
+                        <MudText Class="user-name">@(user?.FullName ?? "Пользователь")</MudText>
+                        <MudText Class="user-email">@user?.Email</MudText>
+                    </div>
+                    <MudTooltip Text="Выйти из системы" Placement="Placement.Top">
+                        <MudIconButton 
+                            Icon="@Icons.Material.Filled.Logout" 
+                            Color="Color.Inherit"
+                            Class="@GetLogoutButtonClass()"
+                            OnClick="@LogoutAsync"
+                            aria-label="Выйти из системы"
+                            Size="Size.Small"/>
+                    </MudTooltip>
                 </div>
-                <MudTooltip Text="Выйти из системы" Placement="Placement.Top">
-                    <MudIconButton 
-                        Icon="@Icons.Material.Filled.Logout" 
-                        Color="Color.Inherit"
-                        Class="@GetLogoutButtonClass()"
-                        OnClick="@LogoutAsync"
-                        aria-label="Выйти из системы"
-                        Size="Size.Small"/>
-                </MudTooltip>
-            </div>
+            </a>
         }
         else
         {
-            <div class="guest-profile-footer">
-                <MudAvatar Class="user-avatar" Color="Color.Default" Size="Size.Small">
-                    <MudIcon Icon="@Icons.Material.Filled.PersonOutline" Class="user-avatar-icon"/>
-                </MudAvatar>
-                <div class="user-info">
-                    <MudText Class="user-name text-muted">Гость</MudText>
-                    <MudText Class="user-email">Войдите для доступа</MudText>
+            <a href="/register">
+                <div class="guest-profile-footer">
+                    <MudAvatar Class="user-avatar" Color="Color.Default" Size="Size.Small">
+                        <MudIcon Icon="@Icons.Material.Filled.PersonOutline" Class="user-avatar-icon"/>
+                    </MudAvatar>
+                    <div class="user-info">
+                        <MudText Class="user-name text-muted">Гость</MudText>
+                        <MudText Class="user-email">Войдите для доступа</MudText>
+                    </div>
                 </div>
-            </div>
+            </a>
         }
     </div>
 </MudNavMenu>
