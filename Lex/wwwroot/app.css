@@ -1149,3 +1149,42 @@ html {
     from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
 }
+
+.profile-hero {
+    border: 1px solid var(--mud-palette-lines-default);
+}
+
+.profile-avatar {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.profile-avatar:hover {
+    transform: scale(1.06);
+}
+
+.profile-progress {
+    height: 8px;
+    transition: all 0.4s ease;
+}
+
+.section-card {
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.section-card:hover {
+    box-shadow: var(--mud-elevation-3);
+}
+
+.sticky-actions {
+    position: sticky;
+    bottom: 16px;
+    background: var(--mud-palette-surface);
+    border: 1px solid var(--mud-palette-lines-default);
+    z-index: 5;
+    flex-wrap: wrap;
+}
+
+.save-button {
+    transition: background-color 0.3s ease, transform 0.15s ease;
+}
+.save-button:active {
+    transform: scale(0.97);
+}

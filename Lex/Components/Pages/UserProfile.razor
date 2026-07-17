@@ -1,0 +1,412 @@
+﻿@page "/profile"
+@implements IDisposable
+@attribute [Authorize]
+@using Lex.Components.Auth
+@using Lex.Components.Utils
+@using Lex.Domain.DTOs
+@using Lex.Domain.Enums
+@using Lex.Domain.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@inject IUserProfileService ProfileService
+@inject UserContext UserContext
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+
+    @if (_isLoading)
+    {
+        <MudPaper Class="pa-6 rounded-lg mb-4" Elevation="0">
+            <MudSkeleton SkeletonType="SkeletonType.Circle" Width="72px" Height="72px" Class="mb-3" />
+            <MudSkeleton Width="40%" Height="32px" Class="mb-2" />
+            <MudSkeleton Width="25%" Height="20px" />
+        </MudPaper>
+        <MudSkeleton Width="100%" Height="320px" Class="rounded-lg" />
+    }
+    else if (_model == null)
+    {
+        <MudAlert Severity="Severity.Error">Не удалось загрузить данные профиля.</MudAlert>
+    }
+    else
+    {
+        <NavigationLock ConfirmExternalNavigation="@_isDirty"
+                         OnBeforeInternalNavigation="OnBeforeLeave" />
+
+        <!-- Hero -->
+        <MudPaper Class="pa-6 rounded-lg mb-4 profile-hero" Elevation="0">
+            <div class="d-flex align-center gap-4 flex-wrap">
+                <MudAvatar Size="Size.Large" Color="@_avatarColor" Style="width:72px;height:72px;font-size:1.6rem;" Class="profile-avatar">
+                    @_initials
+                </MudAvatar>
+
+                <div class="flex-grow-1">
+                    <MudText Typo="Typo.h4">
+                        @(string.IsNullOrWhiteSpace(_fullName) ? "Новый пользователь" : _fullName)
+                    </MudText>
+                    <div class="d-flex align-center gap-2 flex-wrap mt-1">
+                        <MudText Typo="Typo.body2" Class="text-muted">@_model.Email</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="@(_model.IsActive ? Color.Success : Color.Error)" Variant="Variant.Text">
+                            @(_model.IsActive ? "Активен" : "Заблокирован")
+                        </MudChip>
+                        <MudTooltip Text="@($"Дата регистрации: {_model.MemberSinceUtc.ToLocalTime():dd.MM.yyyy}")">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Filled.Schedule">
+                                С нами @_memberForText
+                            </MudChip>
+                        </MudTooltip>
+                        @if (!string.IsNullOrWhiteSpace(_model.OrganizationName))
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Apartment">
+                                @_model.OrganizationName
+                            </MudChip>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Заполненность профиля -->
+            <div class="mt-4">
+                <div class="d-flex justify-space-between align-center mb-1">
+                    <MudText Typo="Typo.caption" Class="text-muted">Заполненность профиля</MudText>
+                    <MudText Typo="Typo.caption" Class="text-muted">@_completeness%</MudText>
+                </div>
+                <MudProgressLinear Value="@_completeness"
+                                   Color="@(_completeness == 100 ? Color.Success : Color.Primary)"
+                                   Rounded="true"
+                                   Class="profile-progress" />
+            </div>
+        </MudPaper>
+
+        <!-- Форма -->
+        <EditForm EditContext="@_editContext" OnValidSubmit="SaveProfile">
+            <DataAnnotationsValidator />
+
+            <MudCard Elevation="1" Class="mb-4 section-card">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-3 d-flex align-center gap-1">
+                        <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                        Личные данные
+                    </MudText>
+
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_model.FirstName" For="@(() => _model.FirstName)" Label="Имя" T="string"
+                                          Variant="Variant.Outlined"
+                                          MaxLength="100" Counter="100"
+                                          HelperText="Отображается в чек-листах и документах"
+                                          Immediate="true" Class="mb-1" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_model.LastName" For="@(() => _model.LastName)" Label="Фамилия" T="string"
+                                          Variant="Variant.Outlined"
+                                          MaxLength="100" Counter="100"
+                                          HelperText="Отображается в чек-листах и документах"
+                                          Immediate="true" Class="mb-1" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTooltip Text="Влияет на то, какие чек-листы и шаблоны вам будут рекомендованы" Placement="Placement.Top" RootClass="d-block">
+                                <MudSelect @bind-Value="_model.ActivityType" For="@(() => _model.ActivityType)" Label="Тип деятельности" T="UserActivityType"
+                                           Variant="Variant.Outlined"
+                                           AdornmentIcon="@Icons.Material.Filled.HelpOutline" Adornment="Adornment.End"
+                                           AnchorOrigin="Origin.BottomCenter">
+                                    @foreach (var type in Enum.GetValues<UserActivityType>())
+                                    {
+                                        <MudSelectItem Value="type">@DisplayHelper.GetActivityTypeDisplay(type)</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudTooltip>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            <MudCard Elevation="1" Class="mb-4 section-card">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-3 d-flex align-center gap-1">
+                        <MudIcon Icon="@Icons.Material.Filled.Work" Size="Size.Small" />
+                        Профессиональная информация
+                    </MudText>
+
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_model.JobTitle" For="@(() => _model.JobTitle)" Label="Должность" T="string"
+                                          Variant="Variant.Outlined"
+                                          MaxLength="200" Counter="200"
+                                          HelperText="Например: юрист, HR-менеджер"
+                                          Immediate="true" Class="mb-1" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_model.CompanyName" For="@(() => _model.CompanyName)" Label="Компания" T="string"
+                                          Variant="Variant.Outlined"
+                                          MaxLength="200" Counter="200"
+                                          HelperText="Необязательно"
+                                          Immediate="true" Class="mb-1" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_model.Region" For="@(() => _model.Region)" Label="Регион" T="string"
+                                          Variant="Variant.Outlined"
+                                          MaxLength="200" Counter="200"
+                                          HelperText="Используется для учёта местного законодательства"
+                                          Immediate="true" Class="mb-1" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTooltip Text="Не публикуется, используется только для внутренней статистики">
+                                <MudDatePicker Date="@_model.BirthDate"
+                                               DateChanged="@OnBirthDateChanged"
+                                               For="@(() => _model.BirthDate)"
+                                               Label="Дата рождения"
+                                               Variant="Variant.Outlined"
+                                               MaxDate="@DateTime.Today"
+                                               Editable="true"
+                                               HelperText="Необязательно" />
+                            </MudTooltip>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            <div class="d-flex align-center gap-2 sticky-actions pa-3 rounded-lg">
+                <MudButton Variant="Variant.Filled"
+                           Color="@(_saveState == SaveState.Success ? Color.Success : Color.Primary)"
+                           ButtonType="ButtonType.Submit"
+                           Disabled="@(!_isDirty || _saveState == SaveState.Saving)"
+                           Class="save-button">
+                    @if (_saveState == SaveState.Saving)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Сохранение...</span>
+                    }
+                    else if (_saveState == SaveState.Success)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Class="mr-1" />
+                        <span>Сохранено</span>
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Save" Size="Size.Small" Class="mr-1" />
+                        <span>Сохранить</span>
+                    }
+                </MudButton>
+
+                @if (_isDirty && _saveState != SaveState.Saving)
+                {
+                    <MudButton Variant="Variant.Text" OnClick="DiscardChanges">
+                        Отменить изменения
+                    </MudButton>
+                    <MudSpacer />
+                    <MudText Typo="Typo.caption" Class="text-muted d-flex align-center gap-1">
+                        <MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Size="Size.Small" Style="font-size: 8px; color: var(--mud-palette-warning);" />
+                        Есть несохранённые изменения
+                    </MudText>
+                }
+            </div>
+        </EditForm>
+    }
+</MudContainer>
+
+@code {
+    private ProfileEditModel? _model;
+    private ProfileEditModel? _snapshot;
+    private EditContext? _editContext;
+    private bool _isLoading = true;
+    private bool _isDirty;
+    private Guid? _currentUserId;
+    private SaveState _saveState = SaveState.Idle;
+
+    private enum SaveState { Idle, Saving, Success }
+
+    private string _fullName => _model is null ? "" :
+        string.Join(" ", new[] { _model.FirstName, _model.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)));
+
+    private string _initials => _model is null ? "?" :
+        string.Concat(new[] { _model.FirstName, _model.LastName }
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => char.ToUpper(s![0])))
+            is { Length: > 0 } s ? s : "?";
+
+    private Color _avatarColor => _model?.Email switch
+    {
+        null => Color.Primary,
+        _ => GetColorFromEmail(_model.Email)
+    };
+
+    private static Color GetColorFromEmail(string email)
+    {
+        var hash = Math.Abs(email.GetHashCode()) % 5;
+        return hash switch
+        {
+            0 => Color.Primary,
+            1 => Color.Secondary,
+            2 => Color.Info,
+            3 => Color.Success,
+            _ => Color.Tertiary
+        };
+    }
+    
+    private void OnBirthDateChanged(DateTime? value)
+    {
+        _model!.BirthDate = value;
+        _editContext?.NotifyFieldChanged(FieldIdentifier.Create(() => _model.BirthDate));
+    }
+    
+    private string _memberForText
+    {
+        get
+        {
+            if (_model is null) return "";
+            var days = (DateTime.UtcNow - _model.MemberSinceUtc).TotalDays;
+
+            if (days < 1)
+                return "меньше дня";
+            if (days < 30)
+                return $"{(int)days} дн.";
+            if (days < 365)
+                return $"{(int)(days / 30)} мес.";
+            return $"{(int)(days / 365)} г.";
+        }
+    }
+    
+    private int _completeness
+    {
+        get
+        {
+            if (_model is null) return 0;
+            var fields = new[]
+            {
+                !string.IsNullOrWhiteSpace(_model.FirstName),
+                !string.IsNullOrWhiteSpace(_model.LastName),
+                _model.ActivityType != UserActivityType.Guest,
+                !string.IsNullOrWhiteSpace(_model.JobTitle),
+                !string.IsNullOrWhiteSpace(_model.CompanyName),
+                !string.IsNullOrWhiteSpace(_model.Region),
+                _model.BirthDate.HasValue
+            };
+            return (int)Math.Round(100.0 * fields.Count(f => f) / fields.Length);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentUserId = Guid.TryParse(UserContext.CurrentUser?.UserId, out var uid) ? uid : null;
+        if (!_currentUserId.HasValue)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        try
+        {
+            _model = await ProfileService.GetProfileForEditAsync(_currentUserId.Value);
+            TakeSnapshot();
+
+            _editContext = new EditContext(_model);
+            _editContext.OnFieldChanged += HandleFieldChanged;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка загрузки: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs args)
+    {
+        RecalculateDirty();
+        StateHasChanged(); // событие приходит вне обычного рендер-цикла компонента, нужен явный вызов
+    }
+    
+    private void RecalculateDirty()
+    {
+        if (_model is null || _snapshot is null) return;
+        _isDirty =
+            _model.FirstName != _snapshot.FirstName ||
+            _model.LastName != _snapshot.LastName ||
+            _model.ActivityType != _snapshot.ActivityType ||
+            _model.JobTitle != _snapshot.JobTitle ||
+            _model.CompanyName != _snapshot.CompanyName ||
+            _model.Region != _snapshot.Region ||
+            _model.BirthDate != _snapshot.BirthDate;
+
+        if (_isDirty) _saveState = SaveState.Idle;
+    }
+
+    private void TakeSnapshot()
+    {
+        if (_model is null) return;
+        _snapshot = new ProfileEditModel
+        {
+            FirstName = _model.FirstName,
+            LastName = _model.LastName,
+            ActivityType = _model.ActivityType,
+            JobTitle = _model.JobTitle,
+            CompanyName = _model.CompanyName,
+            Region = _model.Region,
+            BirthDate = _model.BirthDate,
+            Email = _model.Email,
+            MemberSinceUtc = _model.MemberSinceUtc,
+            IsActive = _model.IsActive,
+            OrganizationName = _model.OrganizationName
+        };
+        _isDirty = false;
+    }
+
+    private void DiscardChanges()
+    {
+        if (_snapshot is null) return;
+        _model!.FirstName = _snapshot.FirstName;
+        _model.LastName = _snapshot.LastName;
+        _model.ActivityType = _snapshot.ActivityType;
+        _model.JobTitle = _snapshot.JobTitle;
+        _model.CompanyName = _snapshot.CompanyName;
+        _model.Region = _snapshot.Region;
+        _model.BirthDate = _snapshot.BirthDate;
+        _isDirty = false;
+        _saveState = SaveState.Idle;
+
+        _editContext?.MarkAsUnmodified(); // сбрасываем внутреннее состояние "изменённости" полей EditContext
+        Snackbar.Add("Изменения отменены", Severity.Info);
+    }
+
+
+    private async Task SaveProfile()
+    {
+        if (_currentUserId == null || _model == null) return;
+        _saveState = SaveState.Saving;
+        StateHasChanged();
+
+        try
+        {
+            await ProfileService.SaveProfileAsync(_currentUserId.Value, _model);
+            TakeSnapshot();
+            _editContext?.MarkAsUnmodified();
+            _saveState = SaveState.Success;
+            Snackbar.Add("Профиль сохранён", Severity.Success);
+            StateHasChanged();
+
+            await Task.Delay(1600);
+            _saveState = SaveState.Idle;
+        }
+        catch (Exception ex)
+        {
+            _saveState = SaveState.Idle;
+            Snackbar.Add($"Ошибка сохранения: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private void OnBeforeLeave(LocationChangingContext ctx)
+    {
+        if (_isDirty)
+            ctx.PreventNavigation();
+    }
+
+    public void Dispose()
+    {
+        if (_editContext is not null)
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+    }
+}

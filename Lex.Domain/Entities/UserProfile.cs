@@ -16,5 +16,5 @@ public class UserProfile : BaseEntity
     [MaxLength(200)]
     public string? Region { get; set; }
 
-    public DateOnly? BirthDate { get; set; }
+    public DateTime? BirthDate { get; set; }
 }

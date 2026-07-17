@@ -65,6 +65,7 @@ builder.Services.AddScoped<ChecklistRepository>();
 builder.Services.AddScoped<DocumentRepository>();
 builder.Services.AddScoped<DocumentVersionRepository>();
 builder.Services.AddScoped<ActiveChecklistRepository>();
+builder.Services.AddScoped<UserProfileRepository>(); 
 
 //Сервисы
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
@@ -72,6 +73,7 @@ builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<ITemplateCatalogService, TemplateCatalogService>();
 builder.Services.AddScoped<IChecklistCatalogService, ChecklistCatalogService>();
 builder.Services.AddScoped<IActiveChecklistService, ActiveChecklistService>();
+builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 
 //Утилитарный сервис для получения имени из enum
 builder.Services.AddScoped<IDocumentHelperService, DocumentHelperService>();
