@@ -119,12 +119,14 @@
                           Adornment="Adornment.End"
                           AdornmentIcon="@Icons.Material.Filled.ContentCopy"
                           OnAdornmentClick="@(() => CopyDocumentLink(_documentLink))" />
-            <MudTextField T="string" Label="Ссылка для приглашения редактора"
-                          Value="@_editorInviteLink" ReadOnly="true"
-                          Adornment="Adornment.End"
-                          AdornmentIcon="@Icons.Material.Filled.ContentCopy"
-                          OnAdornmentClick="@(() => CopyEditorInviteLink(_editorInviteLink))" />
-
+            @if (_canEdit)
+            {
+                <MudTextField T="string" Label="Ссылка для приглашения редактора"
+                                Value="@_editorInviteLink" ReadOnly="true"
+                                Adornment="Adornment.End"
+                                AdornmentIcon="@Icons.Material.Filled.ContentCopy"
+                                OnAdornmentClick="@(() => CopyEditorInviteLink(_editorInviteLink))" />
+            }
             <MudDivider />
             <MudText Typo="Typo.subtitle2">Редакторы (@_editors.Count)</MudText>
             <MudList T="User" Class="editors-list">
