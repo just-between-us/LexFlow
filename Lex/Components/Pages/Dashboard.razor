@@ -1,7 +1,239 @@
 ﻿@page "/dashboard"
+@attribute [Authorize]
+@using Lex.Components.Auth
+@using Lex.Domain.DTOs
+@using Lex.Domain.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@inject IDashboardService DashboardService
+@inject UserContext UserContext
+@inject NavigationManager NavigationManager
 
-<PageTitle>Dashboard</PageTitle>
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+
+    <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-6">
+        <div>
+            <MudText Typo="Typo.h3">Дашборд</MudText>
+            <MudText Typo="Typo.body2" Class="text-muted">
+                @(_scope == DashboardScope.Personal ? "Ваша активность" : _orgDashboard?.OrganizationName)
+            </MudText>
+        </div>
+
+        @if (_orgDashboard is not null)
+        {
+            <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary">
+                <MudButton Variant="@(_scope == DashboardScope.Personal ? Variant.Filled : Variant.Outlined)"
+                           OnClick="@(() => _scope = DashboardScope.Personal)">
+                    Личный
+                </MudButton>
+                <MudButton Variant="@(_scope == DashboardScope.Organization ? Variant.Filled : Variant.Outlined)"
+                           OnClick="@(() => _scope = DashboardScope.Organization)">
+                    Организация
+                </MudButton>
+            </MudButtonGroup>
+        }
+    </div>
+
+    @if (_isLoading)
+    {
+        <MudGrid>
+            @for (int i = 0; i < 4; i++)
+            {
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSkeleton Width="100%" Height="120px" Class="rounded-lg" />
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else if (_scope == DashboardScope.Personal)
+    {
+        @RenderStats(_personalDashboard!.Checklists, _personalDashboard.Documents)
+        @RenderActivity(_personalDashboard.RecentChecklists, _personalDashboard.RecentDocuments, showOwner: false)
+    }
+    else if (_orgDashboard is not null)
+    {
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-4 rounded-lg stat-card" Elevation="0">
+                    <MudText Typo="Typo.caption" Class="text-muted">Сотрудников</MudText>
+                    <MudText Typo="Typo.h4">@_orgDashboard.StaffCount</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        @RenderStats(_orgDashboard.Checklists, _orgDashboard.Documents)
+
+        @if (_orgDashboard.TopContributors.Any())
+        {
+            <MudText Typo="Typo.h6" Class="mb-2 mt-2">Самые активные сотрудники</MudText>
+            <MudCard Elevation="1" Class="section-card mb-6">
+                <MudCardContent>
+                    @foreach (var person in _orgDashboard.TopContributors)
+                    {
+                        <div class="d-flex align-center gap-3 py-2">
+                            <MudAvatar Color="Color.Secondary" Size="Size.Small">
+                                @string.Concat(person.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => char.ToUpper(p[0])))
+                            </MudAvatar>
+                            <MudText Typo="Typo.body1" Class="flex-grow-1">@person.FullName</MudText>
+                            <MudText Typo="Typo.caption" Class="text-muted">
+                                @person.ChecklistsStarted чек-листов · @person.DocumentsCreated документов
+                            </MudText>
+                        </div>
+                    }
+                </MudCardContent>
+            </MudCard>
+        }
+
+        @RenderActivity(_orgDashboard.RecentChecklists, _orgDashboard.RecentDocuments, showOwner: true)
+    }
+
+    <!-- Placeholder heatmap -->
+    <MudText Typo="Typo.h6" Class="mb-2 mt-2">Активность за год</MudText>
+    <MudPaper Class="pa-4 rounded-lg mb-2" Elevation="0">
+        <div class="heatmap-grid">
+            @for (int i = 0; i < 371; i++)
+            {
+                <MudTooltip Text="Тепловая карта скоро появится здесь">
+                    <div class="heatmap-cell" style="opacity: @GetPlaceholderOpacity(i)"></div>
+                </MudTooltip>
+            }
+        </div>
+    </MudPaper>
+    <MudText Typo="Typo.caption" Class="text-muted mb-6">
+        Демо-заглушка — реальная активность появится здесь позже
+    </MudText>
+
+</MudContainer>
 
 @code {
-    
+    private enum DashboardScope { Personal, Organization }
+    private DashboardScope _scope = DashboardScope.Personal;
+
+    private PersonalDashboardDto? _personalDashboard;
+    private OrganizationDashboardDto? _orgDashboard;
+    private bool _isLoading = true;
+    private Guid? _currentUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentUserId = Guid.TryParse(UserContext.CurrentUser?.UserId, out var uid) ? uid : null;
+        if (!_currentUserId.HasValue)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        _personalDashboard = await DashboardService.GetPersonalDashboardAsync(_currentUserId.Value);
+        _orgDashboard = await DashboardService.GetOrganizationDashboardAsync(_currentUserId.Value);
+
+        _isLoading = false;
+    }
+
+    private RenderFragment RenderStats(ChecklistDashboardStatsDto checklists, DocumentDashboardStatsDto documents) => __builder =>
+    {
+        <MudGrid Class="mb-6">
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4 rounded-lg stat-card h-100" Elevation="0">
+                    <MudText Typo="Typo.subtitle2" Class="mb-3 d-flex align-center gap-1">
+                        <MudIcon Icon="@Icons.Material.Filled.Checklist" Size="Size.Small" /> Чек-листы
+                    </MudText>
+                    <div class="d-flex align-center gap-4">
+                        <MudProgressCircular Value="@checklists.CompletionRatePercent" Size="Size.Large" Color="Color.Primary" StrokeWidth="6">
+                            <MudText Typo="Typo.body2">@($"{checklists.CompletionRatePercent:0}%")</MudText>
+                        </MudProgressCircular>
+                        <div>
+                            <MudText Typo="Typo.body2">Всего: @checklists.TotalActive</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Success">Завершено: @checklists.Completed</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Primary">В процессе: @checklists.InProgress</MudText>
+                        </div>
+                    </div>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4 rounded-lg stat-card h-100" Elevation="0">
+                    <MudText Typo="Typo.subtitle2" Class="mb-3 d-flex align-center gap-1">
+                        <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Small" /> Документы
+                    </MudText>
+                    <MudText Typo="Typo.h4" Class="mb-2">@documents.Total</MudText>
+                    <div class="d-flex flex-wrap gap-1 mb-2">
+                        @foreach (var (status, count) in documents.ByStatus)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@status: @count</MudChip>
+                        }
+                    </div>
+                    <MudText Typo="Typo.caption" Class="text-muted">
+                        Изменено за 7 дней: @documents.EditedLast7Days
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    };
+
+    private RenderFragment RenderActivity(
+        List<ChecklistActivitySummaryDto> checklists,
+        List<DocumentActivitySummaryDto> documents,
+        bool showOwner) => _ =>
+    {
+        <MudGrid Class="mb-6">
+            <MudItem xs="12" md="6">
+                <MudText Typo="Typo.h6" Class="mb-2">Недавние чек-листы</MudText>
+                @if (!checklists.Any())
+                {
+                    <MudText Typo="Typo.body2" Class="text-muted">Пока нет активности</MudText>
+                }
+                else
+                {
+                    <MudStack Spacing="2">
+                        @foreach (var c in checklists)
+                        {
+                            <MudPaper Class="pa-3 rounded-lg activity-row" Elevation="0"
+                                      @onclick="@(() => NavigationManager.NavigateTo($"/checklists/active/{c.Id}"))">
+                                <div class="d-flex justify-space-between align-center">
+                                    <MudText Typo="Typo.body1">@c.ChecklistTitle</MudText>
+                                    <MudText Typo="Typo.caption">@($"{c.ProgressPercent:0}%")</MudText>
+                                </div>
+                                <MudProgressLinear Value="@c.ProgressPercent" Class="mt-1" Size="Size.Small" />
+                                @if (showOwner && !string.IsNullOrWhiteSpace(c.OwnerName))
+                                {
+                                    <MudText Typo="Typo.caption" Class="text-muted mt-1">@c.OwnerName</MudText>
+                                }
+                            </MudPaper>
+                        }
+                    </MudStack>
+                }
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudText Typo="Typo.h6" Class="mb-2">Недавние документы</MudText>
+                @if (!documents.Any())
+                {
+                    <MudText Typo="Typo.body2" Class="text-muted">Пока нет активности</MudText>
+                }
+                else
+                {
+                    <MudStack Spacing="2">
+                        @foreach (var d in documents)
+                        {
+                            <MudPaper Class="pa-3 rounded-lg activity-row" Elevation="0">
+                                <div class="d-flex justify-space-between align-center">
+                                    <MudText Typo="Typo.body1">@d.Title</MudText>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@d.Status</MudChip>
+                                </div>
+                                <MudText Typo="Typo.caption" Class="text-muted">
+                                    @d.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                    @(showOwner && !string.IsNullOrWhiteSpace(d.OwnerName) ? $" · {d.OwnerName}" : "")
+                                </MudText>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                }
+            </MudItem>
+        </MudGrid>
+    };
+
+    // Детерминированная "случайная" непрозрачность для визуальной заглушки — без реальных данных
+    private static double GetPlaceholderOpacity(int index)
+    {
+        var pseudoRandom = (index * 37 % 100) / 100.0;
+        return 0.08 + pseudoRandom * 0.3;
+    }
 }
