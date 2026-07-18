@@ -1,0 +1,493 @@
+﻿@page "/organization"
+@implements IDisposable
+@attribute [Authorize]
+@using Lex.Components.Auth
+@using Lex.Domain.DTOs
+@using Lex.Domain.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@inject IClientOrganizationService OrgService
+@inject UserContext UserContext
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+
+    @if (_isLoading)
+    {
+        <MudSkeleton Width="100%" Height="200px" Class="rounded-lg mb-4" />
+        <MudSkeleton Width="100%" Height="320px" Class="rounded-lg" />
+    }
+    else if (_organization is null)
+    {
+        <MudPaper Class="pa-6 rounded-lg mb-4 text-center profile-hero" Elevation="0">
+            <MudIcon Icon="@Icons.Material.Filled.Apartment" Size="Size.Large" Class="mb-2 text-muted" />
+            <MudText Typo="Typo.h5" Class="mb-1">У вас пока нет организации</MudText>
+            <MudText Typo="Typo.body2" Class="text-muted">
+                Создайте организацию, чтобы объединить сотрудников, документы и чек-листы в одном месте
+            </MudText>
+        </MudPaper>
+
+        <EditForm EditContext="@_createContext" OnValidSubmit="CreateOrganization">
+            <DataAnnotationsValidator />
+            <MudCard Elevation="1" Class="section-card">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_createModel.Name" For="@(() => _createModel.Name)"
+                                          Label="Название организации" T="string"
+                                          Variant="Variant.Outlined"
+                                          MaxLength="300" Counter="300"
+                                          HelperText="Например: ООО «Ромашка»" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_createModel.Description" For="@(() => _createModel.Description)"
+                                          Label="Описание" T="string"
+                                          Variant="Variant.Outlined"
+                                          Lines="3" MaxLength="1000" Counter="1000"
+                                          HelperText="Необязательно" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_createModel.TaxId" For="@(() => _createModel.TaxId)"
+                                          Label="ИНН" T="string"
+                                          Variant="Variant.Outlined"
+                                          MaxLength="200" Counter="200"
+                                          HelperText="Необязательно" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_createModel.RegistrationNumber" For="@(() => _createModel.RegistrationNumber)"
+                                          Label="ОГРН/ОГРНИП" T="string"
+                                          Variant="Variant.Outlined"
+                                          MaxLength="200" Counter="200"
+                                          HelperText="Необязательно" />
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+                <MudCardActions Class="pa-4">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" ButtonType="ButtonType.Submit"
+                               StartIcon="@Icons.Material.Filled.Add" Disabled="@_isSaving" Class="save-button">
+                        @(_isSaving ? "Создание..." : "Создать организацию")
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </EditForm>
+    }
+    else if (!_organization.IsCurrentUserOwner)
+    {
+        @* --- Просмотр для сотрудника --- *@
+        <MudPaper Class="pa-6 rounded-lg mb-4 profile-hero" Elevation="0">
+            <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+                <MudText Typo="Typo.h4">@_organization.Name</MudText>
+                <MudChip T="string" Color="@(_organization.IsActive ? Color.Success : Color.Error)" Variant="Variant.Text">
+                    @(_organization.IsActive ? "Активна" : "Неактивна")
+                </MudChip>
+            </div>
+            <MudText Typo="Typo.body2" Class="text-muted mt-1">Владелец: @_organization.OwnerFullName</MudText>
+
+            @if (!string.IsNullOrWhiteSpace(_organization.Description))
+            {
+                <MudText Typo="Typo.body2" Class="mt-3">@_organization.Description</MudText>
+            }
+
+            <div class="d-flex gap-4 flex-wrap mt-3">
+                @if (!string.IsNullOrWhiteSpace(_organization.TaxId))
+                {
+                    <MudText Typo="Typo.caption" Class="text-muted">ИНН: @_organization.TaxId</MudText>
+                }
+                @if (!string.IsNullOrWhiteSpace(_organization.RegistrationNumber))
+                {
+                    <MudText Typo="Typo.caption" Class="text-muted">ОГРН: @_organization.RegistrationNumber</MudText>
+                }
+            </div>
+        </MudPaper>
+
+        <MudText Typo="Typo.h6" Class="mb-2">Коллеги (@(_organization.Staff.Count + 1))</MudText>
+        <MudCard Elevation="1" Class="section-card">
+            <MudCardContent>
+                @RenderPersonRow(_organization.OwnerFullName, _organization.OwnerEmail, isOwner: true)
+                @foreach (var staff in _organization.Staff)
+                {
+                    <MudDivider Class="my-1" />
+                    @RenderPersonRow(staff.FullName, staff.Email, isOwner: false)
+                }
+            </MudCardContent>
+        </MudCard>
+    }
+    else
+    {
+        @* --- Управление для владельца --- *@
+        <NavigationLock ConfirmExternalNavigation="@_isDirty" OnBeforeInternalNavigation="OnBeforeLeave" />
+
+        <MudPaper Class="pa-6 rounded-lg mb-4 profile-hero" Elevation="0">
+            <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+                <MudText Typo="Typo.h4">@_organization.Name</MudText>
+                <MudChip T="string" Color="@(_organization.IsActive ? Color.Success : Color.Error)" Variant="Variant.Text">
+                    @(_organization.IsActive ? "Активна" : "Неактивна")
+                </MudChip>
+            </div>
+            <MudText Typo="Typo.caption" Class="text-muted mt-1">
+                Создана @_organization.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy")
+            </MudText>
+        </MudPaper>
+
+        <EditForm EditContext="@_editContext" OnValidSubmit="SaveOrganization">
+            <DataAnnotationsValidator />
+            <MudCard Elevation="1" Class="mb-4 section-card">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-3 d-flex align-center gap-1">
+                        <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Small" />
+                        Данные организации
+                    </MudText>
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_editModel!.Name" For="@(() => _editModel.Name)"
+                                          Label="Название" T="string"
+                                          Variant="Variant.Outlined"
+                                          MaxLength="300" Counter="300" Immediate="true" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_editModel.Description" For="@(() => _editModel.Description)"
+                                          Label="Описание" T="string"
+                                          Variant="Variant.Outlined"
+                                          Lines="3" MaxLength="1000" Counter="1000" Immediate="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_editModel.TaxId" For="@(() => _editModel.TaxId)"
+                                          Label="ИНН" T="string"
+                                          Variant="Variant.Outlined"
+                                          MaxLength="200" Counter="200" Immediate="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_editModel.RegistrationNumber" For="@(() => _editModel.RegistrationNumber)"
+                                          Label="ОГРН/ОГРНИП" T="string"
+                                          Variant="Variant.Outlined"
+                                          MaxLength="200" Counter="200" Immediate="true" />
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            <div class="d-flex align-center gap-2 sticky-actions pa-3 rounded-lg mb-4">
+                <MudButton Variant="Variant.Filled"
+                           Color="@(_saveState == SaveState.Success ? Color.Success : Color.Primary)"
+                           ButtonType="ButtonType.Submit"
+                           Disabled="@(!_isDirty || _saveState == SaveState.Saving)"
+                           Class="save-button">
+                    @if (_saveState == SaveState.Saving)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Сохранение...</span>
+                    }
+                    else if (_saveState == SaveState.Success)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Class="mr-1" />
+                        <span>Сохранено</span>
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Save" Size="Size.Small" Class="mr-1" />
+                        <span>Сохранить</span>
+                    }
+                </MudButton>
+                @if (_isDirty && _saveState != SaveState.Saving)
+                {
+                    <MudButton Variant="Variant.Text" OnClick="DiscardChanges">Отменить изменения</MudButton>
+                }
+            </div>
+        </EditForm>
+
+        <MudCard Elevation="1" Class="section-card">
+            <MudCardContent>
+                <MudText Typo="Typo.h6" Class="mb-3 d-flex align-center gap-1">
+                    <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Small" />
+                    Сотрудники (@(_organization.Staff.Count + 1))
+                </MudText>
+
+                @RenderPersonRow(_organization.OwnerFullName, _organization.OwnerEmail, isOwner: true)
+
+                @foreach (var staff in _organization.Staff)
+                {
+                    <MudDivider Class="my-1" />
+                    <div class="d-flex align-center gap-3 py-2">
+                        <MudAvatar Color="Color.Secondary" Size="Size.Small">@GetInitials(staff.FullName)</MudAvatar>
+                        <div>
+                            <MudText Typo="Typo.body1">@staff.FullName</MudText>
+                            <MudText Typo="Typo.caption" Class="text-muted">@staff.Email</MudText>
+                        </div>
+                        <MudSpacer />
+                        <MudTooltip Text="Удалить из организации">
+                            <MudIconButton Icon="@Icons.Material.Filled.PersonRemove" Size="Size.Small" Color="Color.Error"
+                                           OnClick="@(() => RemoveStaff(staff))" />
+                        </MudTooltip>
+                    </div>
+                }
+
+                @if (!_organization.Staff.Any())
+                {
+                    <MudText Typo="Typo.body2" Class="text-muted pa-2">
+                        Пока нет сотрудников — добавьте первого ниже
+                    </MudText>
+                }
+
+                <MudDivider Class="my-3" />
+
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Добавить сотрудника</MudText>
+                <div class="d-flex align-start gap-2 flex-wrap">
+                    <MudTextField @bind-Value="_newStaffEmail"
+                                  Label="Email или логин"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="employee@company.com"
+                                  Immediate="true"
+                                  OnKeyUp="@(async e => { if (e.Key == "Enter") await AddStaff(); })"
+                                  Error="@(_addStaffError is not null)"
+                                  ErrorText="@_addStaffError"
+                                  HelperText="Пользователь должен быть уже зарегистрирован в системе"
+                                  Class="flex-grow-1" Style="min-width: 240px;" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.PersonAdd"
+                               Disabled="@(_isAddingStaff || string.IsNullOrWhiteSpace(_newStaffEmail))"
+                               OnClick="AddStaff" Style="height: 56px;">
+                        @(_isAddingStaff ? "Добавление..." : "Добавить")
+                    </MudButton>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    }
+</MudContainer>
+
+@code {
+    private OrganizationDto? _organization;
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private Guid? _currentUserId;
+
+    private OrganizationEditModel _createModel = new();
+    private EditContext _createContext = null!;
+
+    private OrganizationEditModel? _editModel;
+    private OrganizationEditModel? _editSnapshot;
+    private EditContext? _editContext;
+    private bool _isDirty;
+    private SaveState _saveState = SaveState.Idle;
+    private enum SaveState { Idle, Saving, Success }
+
+    private string _newStaffEmail = string.Empty;
+    private bool _isAddingStaff;
+    private string? _addStaffError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentUserId = Guid.TryParse(UserContext.CurrentUser?.UserId, out var uid) ? uid : null;
+        _createContext = new EditContext(_createModel);
+
+        if (!_currentUserId.HasValue)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        await LoadOrganization();
+    }
+
+    private async Task LoadOrganization()
+    {
+        try
+        {
+            _organization = await OrgService.GetForUserAsync(_currentUserId!.Value);
+            SetupEditContext();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка загрузки: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void SetupEditContext()
+    {
+        if (_organization is null || !_organization.IsCurrentUserOwner) return;
+
+        _editModel = new OrganizationEditModel
+        {
+            Name = _organization.Name,
+            Description = _organization.Description,
+            TaxId = _organization.TaxId,
+            RegistrationNumber = _organization.RegistrationNumber
+        };
+        TakeSnapshot();
+
+        if (_editContext is not null)
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+
+        _editContext = new EditContext(_editModel);
+        _editContext.OnFieldChanged += HandleFieldChanged;
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs args)
+    {
+        _isDirty = _editContext?.IsModified() ?? false;
+        if (_isDirty) _saveState = SaveState.Idle;
+        StateHasChanged();
+    }
+
+    private void TakeSnapshot()
+    {
+        if (_editModel is null) return;
+        _editSnapshot = new OrganizationEditModel
+        {
+            Name = _editModel.Name,
+            Description = _editModel.Description,
+            TaxId = _editModel.TaxId,
+            RegistrationNumber = _editModel.RegistrationNumber
+        };
+        _isDirty = false;
+    }
+
+    private void DiscardChanges()
+    {
+        if (_editModel is null || _editSnapshot is null) return;
+        _editModel.Name = _editSnapshot.Name;
+        _editModel.Description = _editSnapshot.Description;
+        _editModel.TaxId = _editSnapshot.TaxId;
+        _editModel.RegistrationNumber = _editSnapshot.RegistrationNumber;
+        _isDirty = false;
+        _saveState = SaveState.Idle;
+        _editContext?.MarkAsUnmodified();
+        Snackbar.Add("Изменения отменены", Severity.Info);
+    }
+
+    private async Task CreateOrganization()
+    {
+        if (_currentUserId is null) return;
+        _isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            _organization = await OrgService.CreateAsync(_currentUserId.Value, _createModel);
+            SetupEditContext();
+            Snackbar.Add("Организация создана", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveOrganization()
+    {
+        if (_currentUserId is null || _organization is null || _editModel is null) return;
+        _saveState = SaveState.Saving;
+        StateHasChanged();
+
+        try
+        {
+            _organization = await OrgService.UpdateAsync(_organization.Id, _currentUserId.Value, _editModel);
+            SetupEditContext();
+            _saveState = SaveState.Success;
+            Snackbar.Add("Изменения сохранены", Severity.Success);
+            StateHasChanged();
+
+            await Task.Delay(1600);
+            _saveState = SaveState.Idle;
+        }
+        catch (Exception ex)
+        {
+            _saveState = SaveState.Idle;
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private async Task AddStaff()
+    {
+        if (_currentUserId is null || _organization is null || string.IsNullOrWhiteSpace(_newStaffEmail)) return;
+
+        _isAddingStaff = true;
+        _addStaffError = null;
+        StateHasChanged();
+
+        try
+        {
+            _organization = await OrgService.AddStaffMemberAsync(_organization.Id, _currentUserId.Value, _newStaffEmail.Trim());
+            _newStaffEmail = string.Empty;
+            Snackbar.Add("Сотрудник добавлен", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _addStaffError = ex.Message;
+        }
+        finally
+        {
+            _isAddingStaff = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RemoveStaff(StaffMemberDto staff)
+    {
+        if (_currentUserId is null || _organization is null) return;
+
+        var confirmed = await DialogService.ShowMessageBox(
+            "Удалить сотрудника?",
+            $"«{staff.FullName}» потеряет доступ к организации. Продолжить?",
+            yesText: "Удалить", cancelText: "Отмена");
+
+        if (confirmed != true) return;
+
+        try
+        {
+            _organization = await OrgService.RemoveStaffMemberAsync(_organization.Id, _currentUserId.Value, staff.UserId);
+            Snackbar.Add("Сотрудник удалён", Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private RenderFragment RenderPersonRow(string fullName, string? email, bool isOwner) => __builder =>
+    {
+        <div class="d-flex align-center gap-3 py-2">
+            <MudAvatar Color="@(isOwner ? Color.Primary : Color.Secondary)" Size="Size.Small">@GetInitials(fullName)</MudAvatar>
+            <div>
+                <MudText Typo="Typo.body1">@fullName</MudText>
+                <MudText Typo="Typo.caption" Class="text-muted">@email</MudText>
+            </div>
+            @if (isOwner)
+            {
+                <MudSpacer />
+                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">Владелец</MudChip>
+            }
+        </div>
+    };
+
+    private static string GetInitials(string fullName)
+    {
+        var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var initials = string.Concat(parts.Take(2).Select(p => char.ToUpper(p[0])));
+        return string.IsNullOrEmpty(initials) ? "?" : initials;
+    }
+
+    private void OnBeforeLeave(LocationChangingContext ctx)
+    {
+        if (_isDirty)
+            ctx.PreventNavigation();
+    }
+
+    public void Dispose()
+    {
+        if (_editContext is not null)
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+    }
+}

@@ -17,7 +17,7 @@ public class ClientOrganization : BaseEntity
 
 
     public Guid OwnerUserId { get; set; } //Создатель/Владелец организации (Один-ко-многим: у организации один владелец)
-    [ForeignKey("OwnerUserId")] public User OwnerUser { get; set; } = null!; //Как я понимаю в случае с полями не совпадающими с ущностью по имени нужен FK
+    [ForeignKey("OwnerUserId")] public User OwnerUser { get; set; } = null!; //Как я понимаю в случае с полями не совпадающими с сущностью по имени нужен FK
     
     public ICollection<User> Staff { get; set; } = new List<User>(); //Сотрудники организации (Один-ко-многим: в организации много сотрудников)
     
