@@ -21,6 +21,7 @@ public class DashboardService : IDashboardService
         var checklists = await context.ActiveChecklists
             .AsNoTracking()
             .Include(a => a.Items)
+            .Include(a => a.Checklist)
             .Where(a => a.UserId == userId)
             .ToListAsync(ct);
 
@@ -70,6 +71,7 @@ public class DashboardService : IDashboardService
             .AsNoTracking()
             .Include(a => a.Items)
             .Include(a => a.User)
+            .Include(a => a.Checklist)
             .Where(a => a.ClientOrganizationId == org)
             .ToListAsync(ct);
 
@@ -167,4 +169,137 @@ public class DashboardService : IDashboardService
         UpdatedAtUtc = d.UpdatedAtUtc ?? d.CreatedAtUtc,
         OwnerName = ownerName
     };
+    
+    public async Task<ActivityDashboardDto> GetActivityAsync(Guid userId, bool organizationScope, CancellationToken ct = default)
+{
+    await using var context = await _contextFactory.CreateDbContextAsync(ct);
+
+    Guid? organizationId = null;
+    if (organizationScope)
+    {
+        organizationId = await context.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.ClientOrganizationId)
+            .FirstOrDefaultAsync(ct);
+
+        if (organizationId is null)
+            organizationScope = false; // нет организации — молча падаем в личный скоуп
+    }
+
+    const int rangeDays = 371; // 53 недели, как у GitHub
+    var rangeStartUtc = DateTime.UtcNow.Date.AddDays(-(rangeDays - 1));
+
+    var checklists = await context.ActiveChecklists
+        .AsNoTracking()
+        .Include(a => a.Checklist)
+        .Include(a => a.Items)
+        .Include(a => a.User)
+        .Where(a => organizationScope ? a.ClientOrganizationId == organizationId : a.UserId == userId)
+        .ToListAsync(ct);
+
+    var documents = await context.Documents
+        .AsNoTracking()
+        .Include(d => d.CreatedByUser)
+        .Include(d => d.Versions).ThenInclude(v => v.VersionCreatedByUser)
+        .Where(d => organizationScope
+            ? d.ClientOrganizationId == organizationId
+            : (d.CreatedByUserId == userId || d.Editors.Any(e => e.Id == userId)))
+        .ToListAsync(ct);
+
+    var events = new List<ActivityEventDto>();
+
+    foreach (var a in checklists)
+    {
+        if (a.CreatedAtUtc >= rangeStartUtc)
+        {
+            events.Add(new ActivityEventDto
+            {
+                OccurredAtUtc = a.CreatedAtUtc,
+                Type = ActivityEventType.ChecklistStarted,
+                Title = $"Начат чек-лист «{a.Checklist?.Title ?? "Без названия"}»",
+                NavigateUrl = $"/checklists/active/{a.Id}",
+                ActorName = organizationScope ? (a.User.GetFullName() ?? a.User.Email) : null
+            });
+        }
+
+        foreach (var item in a.Items)
+        {
+            // UpdatedAtUtc проставляется только при реальном изменении (тоггл/заметка),
+            // так что момент старта чек-листа (когда пункты создаются) не задваивает событие
+            if (item.UpdatedAtUtc is { } updatedAt && updatedAt >= rangeStartUtc)
+            {
+                events.Add(new ActivityEventDto
+                {
+                    OccurredAtUtc = updatedAt,
+                    Type = item.IsCompleted ? ActivityEventType.ChecklistItemCompleted : ActivityEventType.ChecklistItemUpdated,
+                    Title = item.IsCompleted ? $"Отмечен пункт «{item.Title}»" : $"Обновлён пункт «{item.Title}»",
+                    SubTitle = a.Checklist?.Title,
+                    NavigateUrl = $"/checklists/active/{a.Id}",
+                    ActorName = organizationScope ? (a.User.GetFullName() ?? a.User.Email) : null
+                });
+            }
+        }
+    }
+
+    foreach (var d in documents)
+    {
+        if (d.CreatedAtUtc >= rangeStartUtc)
+        {
+            events.Add(new ActivityEventDto
+            {
+                OccurredAtUtc = d.CreatedAtUtc,
+                Type = ActivityEventType.DocumentCreated,
+                Title = $"Создан документ «{d.Title}»",
+                NavigateUrl = $"/documents/{d.Id}",
+                ActorName = organizationScope ? (d.CreatedByUser.GetFullName() ?? d.CreatedByUser.Email) : null
+            });
+        }
+
+        foreach (var v in d.Versions)
+        {
+            if (v.CreatedAtUtc >= rangeStartUtc)
+            {
+                events.Add(new ActivityEventDto
+                {
+                    OccurredAtUtc = v.CreatedAtUtc,
+                    Type = ActivityEventType.DocumentVersionSaved,
+                    Title = $"Сохранена версия v{v.VersionNumber} документа «{d.Title}»",
+                    SubTitle = v.ChangeSummary,
+                    NavigateUrl = $"/documents/{d.Id}",
+                    ActorName = organizationScope ? (v.VersionCreatedByUser?.GetFullName() ?? v.VersionCreatedByUser?.Email) : null
+                });
+            }
+        }
+    }
+
+    var countsByDate = events
+        .GroupBy(e => DateOnly.FromDateTime(e.OccurredAtUtc.ToLocalTime()))
+        .ToDictionary(g => g.Key, g => g.Count());
+
+    var startDate = DateOnly.FromDateTime(rangeStartUtc.ToLocalTime());
+    var today = DateOnly.FromDateTime(DateTime.UtcNow.ToLocalTime());
+
+    var heatmapDays = new List<ActivityHeatmapDayDto>();
+    for (var day = startDate; day <= today; day = day.AddDays(1))
+    {
+        heatmapDays.Add(new ActivityHeatmapDayDto { Date = day, Count = countsByDate.GetValueOrDefault(day) });
+    }
+
+    var streak = 0;
+    var cursor = today;
+    while (countsByDate.TryGetValue(cursor, out var c) && c > 0)
+    {
+        streak++;
+        cursor = cursor.AddDays(-1);
+    }
+
+    return new ActivityDashboardDto
+    {
+        HeatmapDays = heatmapDays,
+        TotalEventsInRange = events.Count,
+        CurrentStreakDays = streak,
+        RecentEvents = events.OrderByDescending(e => e.OccurredAtUtc).Take(30).ToList()
+    };
+}
 }

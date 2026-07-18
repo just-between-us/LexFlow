@@ -22,11 +22,11 @@
         {
             <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary">
                 <MudButton Variant="@(_scope == DashboardScope.Personal ? Variant.Filled : Variant.Outlined)"
-                           OnClick="@(() => _scope = DashboardScope.Personal)">
+                           OnClick="@(() => SetScope(DashboardScope.Personal))">
                     Личный
                 </MudButton>
                 <MudButton Variant="@(_scope == DashboardScope.Organization ? Variant.Filled : Variant.Outlined)"
-                           OnClick="@(() => _scope = DashboardScope.Organization)">
+                           OnClick="@(() => SetScope(DashboardScope.Organization))">
                     Организация
                 </MudButton>
             </MudButtonGroup>
@@ -86,18 +86,95 @@
         @RenderActivity(_orgDashboard.RecentChecklists, _orgDashboard.RecentDocuments, showOwner: true)
     }
 
-    <!-- Placeholder heatmap -->
     <MudText Typo="Typo.h6" Class="mb-2 mt-2">Активность за год</MudText>
-    <MudPaper Class="pa-4 rounded-lg mb-2" Elevation="0">
-        <div class="heatmap-grid">
-            @for (int i = 0; i < 371; i++)
-            {
-                <MudTooltip Text="Тепловая карта скоро появится здесь">
-                    <div class="heatmap-cell" style="opacity: @GetPlaceholderOpacity(i)"></div>
-                </MudTooltip>
-            }
-        </div>
-    </MudPaper>
+
+    @if (_isActivityLoading)
+    {
+        <MudSkeleton Width="100%" Height="140px" Class="rounded-lg mb-2" />
+    }
+    else if (_activity is not null)
+    {
+        <MudPaper Class="pa-4 rounded-lg mb-2" Elevation="0">
+            <div class="d-flex justify-space-between align-center mb-3 flex-wrap gap-2">
+                <MudText Typo="Typo.body2" Class="text-muted">
+                    @_activity.TotalEventsInRange событий за последний год
+                </MudText>
+                @if (_activity.CurrentStreakDays > 0)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text" Icon="@Icons.Material.Filled.LocalFireDepartment">
+                        Серия: @_activity.CurrentStreakDays дн.
+                    </MudChip>
+                }
+            </div>
+
+            <div class="heatmap-scroll">
+                <div class="heatmap-grid">
+                    @foreach (var week in _heatmapWeeks)
+                    {
+                        <div class="heatmap-week">
+                            @foreach (var day in week)
+                            {
+                                @if (day is null)
+                                {
+                                    <div class="heatmap-cell heatmap-cell-empty"></div>
+                                }
+                                else
+                                {
+                                    <MudTooltip Text="@GetHeatmapTooltip(day)">
+                                        <div class="heatmap-cell @GetHeatmapLevelClass(day.Count)"></div>
+                                    </MudTooltip>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="d-flex align-center justify-end gap-1 mt-2">
+                <MudText Typo="Typo.caption" Class="text-muted mr-1">Меньше</MudText>
+                @for (int level = 0; level <= 4; level++)
+                {
+                    <div class="heatmap-cell heatmap-legend-cell heatmap-level-@level"></div>
+                }
+                <MudText Typo="Typo.caption" Class="text-muted ml-1">Больше</MudText>
+            </div>
+        </MudPaper>
+
+        <MudText Typo="Typo.h6" Class="mb-2 mt-4">Последние события</MudText>
+        @if (!_activity.RecentEvents.Any())
+        {
+            <MudText Typo="Typo.body2" Class="text-muted mb-6">Пока нет активности</MudText>
+        }
+        else
+        {
+            <MudTimeline TimelinePosition="TimelinePosition.Start" Class="mb-6">
+                @foreach (var evt in _activity.RecentEvents)
+                {
+                    <MudTimelineItem Size="Size.Small" Color="@GetEventColor(evt.Type)" Icon="@GetEventIcon(evt.Type)">
+                        <ItemContent>
+                            <div class="activity-timeline-row @(evt.NavigateUrl is not null ? "activity-clickable" : "")"
+                                 @onclick="@(() => NavigateIfPossible(evt.NavigateUrl))">
+                                <MudText Typo="Typo.body2">@evt.Title</MudText>
+                                <div class="d-flex align-center gap-2 flex-wrap mt-1">
+                                    @if (!string.IsNullOrWhiteSpace(evt.SubTitle))
+                                    {
+                                        <MudText Typo="Typo.caption" Class="text-muted">@evt.SubTitle</MudText>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(evt.ActorName))
+                                    {
+                                        <MudText Typo="Typo.caption" Class="text-muted">· @evt.ActorName</MudText>
+                                    }
+                                    <MudText Typo="Typo.caption" Class="text-muted">
+                                        · @evt.OccurredAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                    </MudText>
+                                </div>
+                            </div>
+                        </ItemContent>
+                    </MudTimelineItem>
+                }
+            </MudTimeline>
+        }
+    }
     <MudText Typo="Typo.caption" Class="text-muted mb-6">
         Демо-заглушка — реальная активность появится здесь позже
     </MudText>
@@ -107,6 +184,10 @@
 @code {
     private enum DashboardScope { Personal, Organization }
     private DashboardScope _scope = DashboardScope.Personal;
+    
+    private ActivityDashboardDto? _activity;
+    private bool _isActivityLoading = true;
+    private List<List<ActivityHeatmapDayDto?>> _heatmapWeeks = new();
 
     private PersonalDashboardDto? _personalDashboard;
     private OrganizationDashboardDto? _orgDashboard;
@@ -119,13 +200,15 @@
         if (!_currentUserId.HasValue)
         {
             _isLoading = false;
+            _isActivityLoading = false;
             return;
         }
 
         _personalDashboard = await DashboardService.GetPersonalDashboardAsync(_currentUserId.Value);
         _orgDashboard = await DashboardService.GetOrganizationDashboardAsync(_currentUserId.Value);
-
         _isLoading = false;
+
+        await LoadActivity();
     }
 
     private RenderFragment RenderStats(ChecklistDashboardStatsDto checklists, DocumentDashboardStatsDto documents) => __builder =>
@@ -171,7 +254,7 @@
     private RenderFragment RenderActivity(
         List<ChecklistActivitySummaryDto> checklists,
         List<DocumentActivitySummaryDto> documents,
-        bool showOwner) => _ =>
+        bool showOwner) => __builder =>
     {
         <MudGrid Class="mb-6">
             <MudItem xs="12" md="6">
@@ -191,7 +274,7 @@
                                     <MudText Typo="Typo.body1">@c.ChecklistTitle</MudText>
                                     <MudText Typo="Typo.caption">@($"{c.ProgressPercent:0}%")</MudText>
                                 </div>
-                                <MudProgressLinear Value="@c.ProgressPercent" Class="mt-1" Size="Size.Small" />
+                                <MudProgressLinear Value="@c.ProgressPercent" Class="mt-1" Size="Size.Small"/>
                                 @if (showOwner && !string.IsNullOrWhiteSpace(c.OwnerName))
                                 {
                                     <MudText Typo="Typo.caption" Class="text-muted mt-1">@c.OwnerName</MudText>
@@ -230,10 +313,77 @@
         </MudGrid>
     };
 
-    // Детерминированная "случайная" непрозрачность для визуальной заглушки — без реальных данных
-    private static double GetPlaceholderOpacity(int index)
+    private async Task LoadActivity()
     {
-        var pseudoRandom = (index * 37 % 100) / 100.0;
-        return 0.08 + pseudoRandom * 0.3;
+        if (_currentUserId is null) return;
+        _isActivityLoading = true;
+        StateHasChanged();
+
+        _activity = await DashboardService.GetActivityAsync(_currentUserId.Value, organizationScope: _scope == DashboardScope.Organization);
+        _heatmapWeeks = BuildHeatmapWeeks(_activity.HeatmapDays);
+
+        _isActivityLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task SetScope(DashboardScope scope)
+    {
+        if (_scope == scope) return;
+        _scope = scope;
+        await LoadActivity(); 
+    }
+
+    private static List<List<ActivityHeatmapDayDto?>> BuildHeatmapWeeks(List<ActivityHeatmapDayDto> days)
+    {
+        if (!days.Any()) return new();
+
+        var cells = new List<ActivityHeatmapDayDto?>();
+        var startPad = (int)days.First().Date.DayOfWeek; 
+        for (int i = 0; i < startPad; i++) cells.Add(null);
+        cells.AddRange(days);
+        while (cells.Count % 7 != 0) cells.Add(null);
+
+        var weeks = new List<List<ActivityHeatmapDayDto?>>();
+        for (int i = 0; i < cells.Count; i += 7)
+            weeks.Add(cells.Skip(i).Take(7).ToList());
+        return weeks;
+    }
+
+    private static string GetHeatmapLevelClass(int count) => count switch
+    {
+        0 => "heatmap-level-0",
+        <= 2 => "heatmap-level-1",
+        <= 4 => "heatmap-level-2",
+        <= 7 => "heatmap-level-3",
+        _ => "heatmap-level-4"
+    };
+
+    private static string GetHeatmapTooltip(ActivityHeatmapDayDto day) =>
+        $"{day.Date:dd.MM.yyyy}: {day.Count} событий";
+
+    private static Color GetEventColor(ActivityEventType type) => type switch
+    {
+        ActivityEventType.ChecklistStarted => Color.Primary,
+        ActivityEventType.ChecklistItemCompleted => Color.Success,
+        ActivityEventType.ChecklistItemUpdated => Color.Info,
+        ActivityEventType.DocumentCreated => Color.Secondary,
+        ActivityEventType.DocumentVersionSaved => Color.Tertiary,
+        _ => Color.Default
+    };
+
+    private static string GetEventIcon(ActivityEventType type) => type switch
+    {
+        ActivityEventType.ChecklistStarted => Icons.Material.Filled.PlayArrow,
+        ActivityEventType.ChecklistItemCompleted => Icons.Material.Filled.CheckCircle,
+        ActivityEventType.ChecklistItemUpdated => Icons.Material.Filled.Edit,
+        ActivityEventType.DocumentCreated => Icons.Material.Filled.NoteAdd,
+        ActivityEventType.DocumentVersionSaved => Icons.Material.Filled.Save,
+        _ => Icons.Material.Filled.Circle
+    };
+
+    private void NavigateIfPossible(string? url)
+    {
+        if (!string.IsNullOrWhiteSpace(url))
+            NavigationManager.NavigateTo(url);
     }
 }
