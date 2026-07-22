@@ -1,0 +1,196 @@
+﻿@page "/companies/{id:guid}"
+@attribute [Authorize]
+@using Lex.Components.Auth
+@using Lex.Components.Utils
+@using Lex.Domain.DTOs
+@using Lex.Domain.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@inject IOrganizationPublicService OrgService
+@inject UserContext UserContext
+@inject IDocumentHelperService DocumentHelperService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    @if (_isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-8" />
+    }
+    else if (_org == null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">Организация не найдена или недоступна.</MudAlert>
+    }
+    else
+    {
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="@(() => Navigation.NavigateTo("/companies/public"))" Class="mb-4">
+            Назад к списку
+        </MudButton>
+
+        <MudPaper Class="pa-6 rounded-lg mb-4 profile-hero" Elevation="0">
+            <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+                <MudText Typo="Typo.h4">@_org.Name</MudText>
+                <MudChip T="string" Color="@(_org.IsActive ? Color.Success : Color.Error)" Variant="Variant.Text">
+                    @(_org.IsActive ? "Активна" : "Неактивна")
+                </MudChip>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_org.Description))
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">@_org.Description</MudText>
+            }
+            <div class="d-flex flex-wrap gap-4 mt-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
+                    Владелец: @_org.OwnerFullName
+                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Small" Class="mr-1" />
+                    Сотрудников: @_org.StaffCount
+                </MudText>
+                @if (!string.IsNullOrWhiteSpace(_org.TaxId))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">ИНН: @_org.TaxId</MudText>
+                }
+                @if (!string.IsNullOrWhiteSpace(_org.RegistrationNumber))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">ОГРН: @_org.RegistrationNumber</MudText>
+                }
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="mr-1" />
+                Создана: @_org.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy")
+            </MudText>
+        </MudPaper>
+
+        <!-- Документы -->
+        <MudText Typo="Typo.h5" Class="mb-3 mt-6">Документы</MudText>
+        @if (!_org.Documents.Any())
+        {
+            <MudPaper Class="pa-4 text-center" Elevation="0">
+                <MudText Color="Color.Secondary">Нет публичных документов</MudText>
+            </MudPaper>
+        }
+        else
+        {
+            <MudGrid>
+                @foreach (var doc in _org.Documents)
+                {
+                    <MudItem xs="12" sm="6" lg="4">
+                        <MudCard Elevation="1" Class="org-doc-card h-100 d-flex flex-column">
+                            <MudCardContent Class="flex-grow-1">
+                                <MudText Typo="Typo.h6" Class="mb-1">@doc.Title</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2 line-clamp-2">
+                                    @(doc.Description ?? "Без описания")
+                                </MudText>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">
+                                        @DocumentHelperService.GetTypeDisplayName(doc.Type)
+                                    </MudChip>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        v.@doc.CurrentVersionNumber
+                                    </MudText>
+                                </div>
+                            </MudCardContent>
+                            <MudCardActions Class="border-top pa-2">
+                                <MudButton StartIcon="@Icons.Material.Filled.Visibility"
+                                           Color="Color.Primary"
+                                           Variant="Variant.Text"
+                                           Size="Size.Small"
+                                           OnClick="@(() => Navigation.NavigateTo($"/documents/{doc.Id}"))"
+                                           FullWidth>
+                                    Просмотр
+                                </MudButton>
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+
+        <!-- Активные чек-листы -->
+        <MudText Typo="Typo.h5" Class="mb-3 mt-6">Активные чек-листы</MudText>
+        @if (!_org.ActiveChecklists.Any())
+        {
+            <MudPaper Class="pa-4 text-center" Elevation="0">
+                <MudText Color="Color.Secondary">Нет активных чек-листов</MudText>
+            </MudPaper>
+        }
+        else
+        {
+            <MudGrid>
+                @foreach (var acl in _org.ActiveChecklists)
+                {
+                    <MudItem xs="12" sm="6" lg="4">
+                        <MudCard Elevation="1" Class="org-acl-card h-100 d-flex flex-column">
+                            <MudCardContent Class="flex-grow-1">
+                                <MudText Typo="Typo.h6" Class="mb-1">@acl.Title</MudText>
+                                <div class="d-flex align-center gap-2 mb-2">
+                                    <MudProgressLinear Value="@acl.Progress" Color="@(acl.Progress == 100 ? Color.Success : Color.Primary)" Class="flex-grow-1" />
+                                    <MudText Typo="Typo.body2">@acl.Progress.ToString("F0")%</MudText>
+                                </div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @acl.CompletedItems из @acl.TotalItems пунктов выполнено
+                                </MudText>
+                            </MudCardContent>
+                            <MudCardActions Class="border-top pa-2">
+                                @if (_org.IsCurrentUserMember)
+                                {
+                                    <MudButton StartIcon="@Icons.Material.Filled.PlayArrow"
+                                               Color="Color.Primary"
+                                               Variant="Variant.Filled"
+                                               Size="Size.Small"
+                                               OnClick="@(() => Navigation.NavigateTo($"/checklists/start/{acl.ActiveChecklistId}"))"
+                                               FullWidth>
+                                        Продолжить
+                                    </MudButton>
+                                }
+                                else
+                                {
+                                    <MudButton StartIcon="@Icons.Material.Filled.Block"
+                                               Color="Color.Default"
+                                               Variant="Variant.Text"
+                                               Size="Size.Small"
+                                               Disabled="true"
+                                               FullWidth>
+                                        Нет доступа
+                                    </MudButton>
+                                }
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private OrganizationDetailsDto? _org;
+    private bool _isLoading = true;
+    private Guid? _currentUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentUserId = Guid.TryParse(UserContext.CurrentUser?.UserId, out var uid) ? uid : null;
+        if (!_currentUserId.HasValue)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        try
+        {
+            _org = await OrgService.GetOrganizationDetailsAsync(Id, _currentUserId.Value);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка загрузки: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

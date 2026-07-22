@@ -77,6 +77,7 @@ builder.Services.AddScoped<IActiveChecklistService, ActiveChecklistService>();
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IClientOrganizationService, ClientOrganizationService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IOrganizationPublicService, OrganizationPublicService>();
 
 //Утилитарный сервис для получения имени из enum
 builder.Services.AddScoped<IDocumentHelperService, DocumentHelperService>();

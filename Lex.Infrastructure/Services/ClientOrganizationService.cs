@@ -1,5 +1,6 @@
 ﻿using Lex.Domain.DTOs;
 using Lex.Domain.Entities;
+using Lex.Domain.Enums;
 using Lex.Domain.Interfaces;
 using Lex.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Identity;
@@ -38,6 +39,7 @@ public class ClientOrganizationService : IClientOrganizationService
             Description = model.Description?.Trim(),
             TaxId = model.TaxId?.Trim(),
             RegistrationNumber = model.RegistrationNumber?.Trim(),
+            Privacy = model.Privacy,  
             OwnerUserId = ownerUserId,
             IsActive = true
         };
@@ -65,6 +67,7 @@ public class ClientOrganizationService : IClientOrganizationService
         org.Name = model.Name.Trim();
         org.Description = model.Description?.Trim();
         org.TaxId = model.TaxId?.Trim();
+        org.Privacy = model.Privacy; 
         org.RegistrationNumber = model.RegistrationNumber?.Trim();
         org.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -153,7 +156,8 @@ public class ClientOrganizationService : IClientOrganizationService
             Description = org.Description,
             TaxId = org.TaxId,
             RegistrationNumber = org.RegistrationNumber,
-            IsActive = org.IsActive,
+            IsActive = org.IsActive,    
+            Privacy = org.Privacy,
             CreatedAtUtc = org.CreatedAtUtc,
             OwnerUserId = org.OwnerUserId,
             OwnerFullName = owner is null ? "—" : (string.IsNullOrWhiteSpace(owner.GetFullName()) ? (owner.Email ?? "—") : owner.GetFullName()!),

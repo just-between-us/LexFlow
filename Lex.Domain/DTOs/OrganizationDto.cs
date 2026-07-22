@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using Lex.Domain.Enums;
 
 namespace Lex.Domain.DTOs;
 
@@ -17,6 +18,8 @@ public class OrganizationDto
     public string? OwnerEmail { get; set; }
 
     public bool IsCurrentUserOwner { get; set; }
+    
+    public OrganizationPrivacy Privacy { get; set; }
 
     public List<StaffMemberDto> Staff { get; set; } = new(); // без владельца — он показывается отдельно
 }
@@ -42,4 +45,5 @@ public class OrganizationEditModel
 
     [MaxLength(200, ErrorMessage = "Максимум 200 символов")]
     public string? RegistrationNumber { get; set; }
+    public OrganizationPrivacy  Privacy { get; set; } =  OrganizationPrivacy.Private;
 }

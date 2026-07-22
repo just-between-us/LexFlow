@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Lex.Domain.Enums;
 
 namespace Lex.Domain.Entities;
 
@@ -14,8 +15,9 @@ public class ClientOrganization : BaseEntity
     [MaxLength(200)] public string? RegistrationNumber { get; set; } // ОГРН/ОГРНИП
     
     public bool IsActive { get; set; } = true;
-
-
+    
+    public OrganizationPrivacy Privacy { get; set; }  = OrganizationPrivacy.Private;
+    
     public Guid OwnerUserId { get; set; } //Создатель/Владелец организации (Один-ко-многим: у организации один владелец)
     [ForeignKey("OwnerUserId")] public User OwnerUser { get; set; } = null!; //Как я понимаю в случае с полями не совпадающими с сущностью по имени нужен FK
     

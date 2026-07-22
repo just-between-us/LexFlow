@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @using Lex.Components.Auth
 @using Lex.Domain.DTOs
+@using Lex.Domain.Enums
 @using Lex.Domain.Interfaces
 @using Microsoft.AspNetCore.Authorization
 @inject IClientOrganizationService OrgService
@@ -59,6 +60,16 @@
                                           Variant="Variant.Outlined"
                                           MaxLength="200" Counter="200"
                                           HelperText="Необязательно" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudSelect @bind-Value="_createModel.Privacy" Label="Приватность" T="OrganizationPrivacy"
+                                       Variant="Variant.Outlined"
+                                       HelperText="Публичные организации видны в общем каталоге">
+                                @foreach (OrganizationPrivacy p in Enum.GetValues(typeof(OrganizationPrivacy)))
+                                {
+                                    <MudSelectItem Value="p">@GetPrivacyDisplay(p)</MudSelectItem>
+                                }
+                            </MudSelect>
                         </MudItem>
                     </MudGrid>
                 </MudCardContent>
@@ -161,6 +172,16 @@
                                           Label="ОГРН/ОГРНИП" T="string"
                                           Variant="Variant.Outlined"
                                           MaxLength="200" Counter="200" Immediate="true" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudSelect @bind-Value="_editModel!.Privacy" Label="Приватность" T="OrganizationPrivacy"
+                                       Variant="Variant.Outlined"
+                                       HelperText="Публичные организации видны в общем каталоге">
+                                @foreach (OrganizationPrivacy p in Enum.GetValues(typeof(OrganizationPrivacy)))
+                                {
+                                    <MudSelectItem Value="p">@GetPrivacyDisplay(p)</MudSelectItem>
+                                }
+                            </MudSelect>
                         </MudItem>
                     </MudGrid>
                 </MudCardContent>
@@ -340,7 +361,8 @@
             Name = _editModel.Name,
             Description = _editModel.Description,
             TaxId = _editModel.TaxId,
-            RegistrationNumber = _editModel.RegistrationNumber
+            RegistrationNumber = _editModel.RegistrationNumber,
+            Privacy = _editModel.Privacy 
         };
         _isDirty = false;
     }
@@ -352,6 +374,7 @@
         _editModel.Description = _editSnapshot.Description;
         _editModel.TaxId = _editSnapshot.TaxId;
         _editModel.RegistrationNumber = _editSnapshot.RegistrationNumber;
+        _editModel.Privacy = _editSnapshot.Privacy;
         _isDirty = false;
         _saveState = SaveState.Idle;
         _editContext?.MarkAsUnmodified();
@@ -490,4 +513,10 @@
         if (_editContext is not null)
             _editContext.OnFieldChanged -= HandleFieldChanged;
     }
+    private static string GetPrivacyDisplay(OrganizationPrivacy p) => p switch
+    {
+        OrganizationPrivacy.Private => "Приватная (только сотрудники)",
+        OrganizationPrivacy.Public => "Публичная (видна всем)",
+        _ => "Неизвестно"
+    };
 }

@@ -1,0 +1,254 @@
+﻿@page "/companies/public"
+@using Lex.Domain.DTOs
+@using Lex.Domain.Interfaces
+@inject IOrganizationPublicService OrgService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+    <div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
+        <div>
+            <MudText Typo="Typo.h4">Публичные компании</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Организации, открытые для просмотра и взаимодействия
+            </MudText>
+        </div>
+    </div>
+
+    <!-- Панель управления -->
+    <MudPaper Class="pa-4 mb-3 rounded-lg toolbar-panel" Elevation="0">
+        <MudStack Row="true" Spacing="2" Class="align-center flex-wrap">
+            <MudTextField @bind-Value="_searchTerm"
+                          Label="Поиск"
+                          Placeholder="Название или описание..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          DebounceInterval="350"
+                          OnDebounceIntervalElapsed="OnSearchDebounced"
+                          OnKeyUp="OnSearchKeyUp"
+                          Clearable="true"
+                          OnClearButtonClick="@(() => OnSearchCleared())"
+                          Variant="Variant.Outlined"
+                          Class="flex-grow-1"
+                          Style="min-width: 220px;"/>
+
+            <MudDivider Vertical="true" Class="mx-1 d-none d-md-flex" />
+
+            <MudTooltip Text="Порядок отображения">
+                <MudMenu Label="@GetSortLabel()"
+                         Icon="@Icons.Material.Filled.Sort"
+                         EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                         Variant="Variant.Text"
+                         Class="flex-shrink-0 rounded-button-hover-scale">
+                    @foreach (var (field, label) in SortOptions)
+                    {
+                        <MudMenuItem OnClick="@(() => SetSort(field))">
+                            <span class="d-flex align-center">
+                                @label
+                                @if (IsCurrentSort(field))
+                                {
+                                    <MudIcon Icon="@GetDirectionIcon()" Size="Size.Small" Class="ml-2" />
+                                }
+                            </span>
+                        </MudMenuItem>
+                    }
+                </MudMenu>
+            </MudTooltip>
+
+            <MudTooltip Text="@(_sortAscending ? "По возрастанию" : "По убыванию")">
+                <div Class="rounded-button-hover-scale">
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward"
+                                   OnClick="@ToggleSortDirection"
+                                   Style="@ArrowRotationStyle"
+                                   Variant="Variant.Text"/>
+                </div>
+            </MudTooltip>
+
+            <MudTooltip Text="Обновить">
+                <div Class="rounded-button-hover-scale">
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                                   OnClick="@OnRefreshClick"
+                                   Disabled="@_isRefreshing"
+                                   Style="@RefreshSpinStyle"
+                                   Variant="Variant.Text"/>
+                </div>
+            </MudTooltip>
+
+            <MudSpacer />
+
+            <MudChip T="string" Size="Size.Medium" Color="Color.Primary" Variant="Variant.Text">
+                @(_totalCount == 0 ? "Ничего не найдено" : $"Найдено: {_totalCount}")
+            </MudChip>
+        </MudStack>
+    </MudPaper>
+
+    <!-- Контент -->
+    @if (_isLoading)
+    {
+        <MudGrid>
+            @for (int i = 0; i < _pageSize; i++)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudPaper Class="pa-4 rounded-lg" Style="height: 200px;">
+                        <MudSkeleton Width="70%" Height="28px" Class="mb-2" />
+                        <MudSkeleton Width="40%" Height="20px" Class="mb-4" />
+                        <MudSkeleton Width="100%" Height="16px" />
+                        <MudSkeleton Width="60%" Height="16px" />
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else if (!_organizations.Any())
+    {
+        <MudPaper Class="pa-8 rounded-lg text-center" Elevation="0" Style="background: var(--mud-palette-background-grey);">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Class="mb-2 text-muted" />
+            <MudText Typo="Typo.h6" Class="mb-1">Публичных компаний не найдено</MudText>
+            <MudText Typo="Typo.body2" Class="text-muted">Попробуйте изменить запрос</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var org in _organizations)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard Elevation="1" Class="org-card h-100 d-flex flex-column">
+                        <MudCardContent Class="flex-grow-1">
+                            <MudText Typo="Typo.h6" Class="mb-1">@org.Name</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2 line-clamp-2">
+                                @(org.Description ?? "Без описания")
+                            </MudText>
+                            <div class="d-flex flex-wrap gap-2">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
+                                    @org.OwnerFullName
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Small" Class="mr-1" />
+                                    @org.StaffCount
+                                </MudText>
+                            </div>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="mr-1" />
+                                @org.CreatedAtUtc.ToString("dd.MM.yyyy")
+                            </MudText>
+                        </MudCardContent>
+                        <MudCardActions Class="border-top pa-2">
+                            <MudButton StartIcon="@Icons.Material.Filled.Visibility"
+                                       Color="Color.Primary"
+                                       Variant="Variant.Text"
+                                       Size="Size.Small"
+                                       OnClick="@(() => ShowStub(org.Id))"
+                                       FullWidth>
+                                Открыть
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+
+        <!-- Пагинация -->
+        @if (_totalPages > 1)
+        {
+            <div class="d-flex flex-column align-center mt-4 gap-2">
+                <MudPagination Selected="@_currentPage" Count="@_totalPages"
+                               SelectedChanged="@OnPaginationChanged" Size="Size.Medium" Color="Color.Primary" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Показано @Math.Min((_currentPage - 1) * _pageSize + 1, _totalCount)–@Math.Min(_currentPage * _pageSize, _totalCount) из @_totalCount
+                </MudText>
+            </div>
+        }
+    }
+
+@code {
+    private List<PublicOrganizationListItemDto> _organizations = new();
+    private int _totalCount;
+    private int _totalPages => Math.Max(1, (_totalCount + _pageSize - 1) / _pageSize);
+    private bool _isLoading;
+    private bool _isRefreshing;
+    private int MinSpinMs = 600;
+
+    private string _searchTerm = string.Empty;
+    private string _sortField = "Name";
+    private bool _sortAscending = true;
+    private int _currentPage = 1;
+    private readonly int _pageSize = 12;
+
+    private static readonly (string Field, string Label)[] SortOptions =
+    {
+        ("Name", "По названию"),
+        ("StaffCount", "По числу сотрудников"),
+        ("CreatedAtUtc", "По дате создания")
+    };
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            var (items, total) = await OrgService.GetPublicOrganizationsAsync(
+                _searchTerm, _sortField, _sortAscending, _currentPage, _pageSize);
+            _organizations = items.ToList();
+            _totalCount = total;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnRefreshClick()
+    {
+        if (_isRefreshing) return;
+        _isRefreshing = true;
+        StateHasChanged();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        await LoadData();
+        var remaining = MinSpinMs - (int)sw.ElapsedMilliseconds;
+        if (remaining > 0) await Task.Delay(remaining);
+        _isRefreshing = false;
+        StateHasChanged();
+    }
+
+    private string ArrowRotationStyle =>
+        $"transform: rotate({(_sortAscending ? 0 : 180)}deg); transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);";
+    private string RefreshSpinStyle =>
+        $"transform: rotate({(_isRefreshing ? 360 : 0)}deg); transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);";
+
+    private async Task OnSearchDebounced(string value) => await ResetAndReload();
+    private async Task OnSearchKeyUp(KeyboardEventArgs e) { if (e.Key == "Enter") await ResetAndReload(); }
+    private async Task OnSearchCleared() { _searchTerm = string.Empty; await ResetAndReload(); }
+
+    private async Task ResetAndReload() { _currentPage = 1; await LoadData(); }
+
+    private async Task OnPaginationChanged(int page) { _currentPage = page; await LoadData(); }
+
+    private async Task SetSort(string field)
+    {
+        if (_sortField == field) _sortAscending = !_sortAscending;
+        else { _sortField = field; _sortAscending = true; }
+        _currentPage = 1;
+        await LoadData();
+    }
+
+    private async Task ToggleSortDirection() { _sortAscending = !_sortAscending; _currentPage = 1; await LoadData(); }
+
+    private bool IsCurrentSort(string field) => _sortField == field;
+    private string GetDirectionIcon() => _sortAscending ? Icons.Material.Filled.ArrowUpward : Icons.Material.Filled.ArrowDownward;
+    private string GetSortLabel() => SortOptions.FirstOrDefault(x => x.Field == _sortField).Label ?? "Сортировка";
+
+    private void ShowStub(Guid id)
+    {
+        Navigation.NavigateTo($"/companies/{id}");
+    }
+}
