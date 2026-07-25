@@ -1,14 +1,13 @@
-﻿@using Lex.Components.Utils
-@using Lex.Domain.DTOs
-@inject IDocumentHelperService DocumentHelperService
+﻿@using lex.Application.DTOs
+@using Lex.Components.Utils
 @inject NavigationManager NavigationManager
 
 <MudCard Elevation="1" Class="@CardClasses">
     <MudCardContent Class="flex-grow-1">
         <div class="d-flex align-start justify-space-between mb-2 gap-2" style="min-width: 0;">
             <div class="d-flex align-center gap-2" style="min-width: 0; width: 100%;">
-                <MudIcon Icon="@DocumentHelperService.GetTypeIcon(Template.Type)" 
-                         Color="@DocumentHelperService.GetTypeColor(Template.Type)" 
+                <MudIcon Icon="@DisplayHelper.GetTypeIcon(Template.Type)" 
+                         Color="@DisplayHelper.GetTypeColor(Template.Type)" 
                          Class="flex-shrink-0" />
                 <MudTooltip Text="@Template.Title" Arrow="true" Placement="Placement.Top">
                     <MudText Typo="Typo.h6" Class="card-title mud-text-truncate" Style="width: 100%;">
@@ -20,9 +19,9 @@
 
         <div class="d-flex gap-1 mb-2 flex-wrap">
             <MudChip T="string" Size="Size.Small" 
-                     Color="@DocumentHelperService.GetTypeColor(Template.Type)" 
+                     Color="@DisplayHelper.GetTypeColor(Template.Type)" 
                      Variant="Variant.Filled">
-                @DocumentHelperService.GetTypeDisplayName(Template.Type)
+                @DisplayHelper.GetTypeDisplayName(Template.Type)
             </MudChip>
             @if (Template.IsPopular)
             {

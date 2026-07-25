@@ -11,7 +11,6 @@
 @inject UserContext UserContext
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
-@inject IDocumentHelperService DocumentHelper
 @inject IClipboardService ClipboardService
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-8">
@@ -32,8 +31,8 @@
             <div>
                 <MudText Typo="Typo.h4">@_document.Title</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    @DocumentHelper.GetStatusDisplayName(_document.Status) · 
-                    @DocumentHelper.GetTypeDisplayName(_document.Type) · 
+                    @DisplayHelper.GetStatusDisplayName(_document.Status) · 
+                    @DisplayHelper.GetTypeDisplayName(_document.Type) · 
                     v.@_selectedVersion?.VersionNumber
                 </MudText>
             </div>

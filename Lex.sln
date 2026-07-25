@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lex.Domain", "Lex.Domain\Le
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lex.Infrastructure", "Lex.Infrastructure\Lex.Infrastructure.csproj", "{BD426EF8-8697-4E14-977F-B29CDABB0600}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "lex.Application", "lex.Application\lex.Application.csproj", "{3EE5B4EC-5A40-4BF1-8657-3667910D0ED6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{BD426EF8-8697-4E14-977F-B29CDABB0600}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BD426EF8-8697-4E14-977F-B29CDABB0600}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BD426EF8-8697-4E14-977F-B29CDABB0600}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3EE5B4EC-5A40-4BF1-8657-3667910D0ED6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3EE5B4EC-5A40-4BF1-8657-3667910D0ED6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3EE5B4EC-5A40-4BF1-8657-3667910D0ED6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3EE5B4EC-5A40-4BF1-8657-3667910D0ED6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

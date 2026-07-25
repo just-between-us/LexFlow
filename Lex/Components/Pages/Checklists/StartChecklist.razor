@@ -1,7 +1,7 @@
 ﻿@page "/checklists/start"
 @attribute [Authorize]
+@using lex.Application.Interfaces
 @using Lex.Components.Auth
-@using Lex.Domain.Interfaces
 @using Microsoft.AspNetCore.Authorization
 @inject IActiveChecklistService ActiveChecklistService
 @inject NavigationManager NavigationManager

@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
-using Lex.Domain.DTOs;
+using lex.Application.DTOs;
 
 namespace Lex.Components.Auth;
 

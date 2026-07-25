@@ -1,12 +1,12 @@
 ﻿@page "/documents/{id:guid}/edit"
 @attribute [Authorize]
+@using lex.Application.DTOs
 @using Lex.Domain.Entities
 @using Lex.Domain.Enums
 @using Lex.Infrastructure.Repositories
 @using Lex.Components.Auth
 @using Lex.Components.Shared
 @using Lex.Components.Utils
-@using Lex.Domain.DTOs
 @using Microsoft.AspNetCore.Authorization
 @using Markdig
 @inject DocumentRepository DocumentRepo
@@ -15,7 +15,6 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
-@inject IDocumentHelperService DocumentHelper
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-8">
     @if (_isLoading)
@@ -35,8 +34,8 @@
             <div>
                 <MudText Typo="Typo.h4">Редактирование: @_document.Title</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    @DocumentHelper.GetStatusDisplayName(_document.Status) · 
-                    @DocumentHelper.GetTypeDisplayName(_document.Type) · 
+                    @DisplayHelper.GetStatusDisplayName(_document.Status) · 
+                    @DisplayHelper.GetTypeDisplayName(_document.Type) · 
                     Текущая версия: v.@_document.CurrentVersionNumber
                     @if (_hasUnsavedChanges)
                     {
@@ -86,7 +85,7 @@
                                        Label="Тип" T="DocumentType" Class="mb-3">
                                 @foreach (var type in Enum.GetValues<DocumentType>())
                                 {
-                                    <MudSelectItem Value="type">@DocumentHelper.GetTypeDisplayName(type)</MudSelectItem>
+                                    <MudSelectItem Value="type">@DisplayHelper.GetTypeDisplayName(type)</MudSelectItem>
                                 }
                             </MudSelect>
 
@@ -95,7 +94,7 @@
                                        Label="Видимость" T="DocumentPrivacy" Class="mb-3">
                                 @foreach (var p in Enum.GetValues<DocumentPrivacy>())
                                 {
-                                    <MudSelectItem Value="p">@DocumentHelper.GetPrivacyDisplayName(p)</MudSelectItem>
+                                    <MudSelectItem Value="p">@DisplayHelper.GetPrivacyDisplayName(p)</MudSelectItem>
                                 }
                             </MudSelect>
                             

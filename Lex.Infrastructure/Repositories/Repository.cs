@@ -1,7 +1,7 @@
 ﻿using Lex.Domain.Entities;
-using Lex.Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
+using lex.Application.Interfaces;
 using Lex.Infrastructure.Data;
 
 namespace Lex.Infrastructure.Repositories;

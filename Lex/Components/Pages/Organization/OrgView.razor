@@ -1,13 +1,12 @@
 ﻿@page "/companies/{id:guid}"
 @attribute [Authorize]
+@using lex.Application.DTOs
+@using lex.Application.Interfaces
 @using Lex.Components.Auth
 @using Lex.Components.Utils
-@using Lex.Domain.DTOs
-@using Lex.Domain.Interfaces
 @using Microsoft.AspNetCore.Authorization
 @inject IOrganizationPublicService OrgService
 @inject UserContext UserContext
-@inject IDocumentHelperService DocumentHelperService
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 
@@ -84,7 +83,7 @@
                                 </MudText>
                                 <div class="d-flex flex-wrap gap-2">
                                     <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">
-                                        @DocumentHelperService.GetTypeDisplayName(doc.Type)
+                                        @DisplayHelper.GetTypeDisplayName(doc.Type)
                                     </MudChip>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">
                                         v.@doc.CurrentVersionNumber

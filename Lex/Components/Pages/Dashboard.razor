@@ -1,8 +1,8 @@
 ﻿@page "/dashboard"
 @attribute [Authorize]
+@using lex.Application.DTOs
+@using lex.Application.Interfaces
 @using Lex.Components.Auth
-@using Lex.Domain.DTOs
-@using Lex.Domain.Interfaces
 @using Microsoft.AspNetCore.Authorization
 @inject IDashboardService DashboardService
 @inject UserContext UserContext

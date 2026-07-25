@@ -1,12 +1,11 @@
 ﻿@page "/templates"
+@using lex.Application.DTOs
+@using lex.Application.Interfaces
 @using Lex.Components.Shared
 @using Lex.Components.Utils
-@using Lex.Domain.DTOs
 @using Lex.Domain.Enums
-@using Lex.Domain.Interfaces
 @inject ITemplateCatalogService CatalogService
 @inject NavigationManager NavigationManager
-@inject IDocumentHelperService DocumentHelperService
 
 <div class="py-4">
     <PageTitle>Каталог шаблонов</PageTitle>
@@ -49,7 +48,7 @@
                 @foreach (var type in Enum.GetValues<DocumentType>())
                 {
                     <MudSelectItem Value="@((DocumentType?)type)">
-                        @DocumentHelperService.GetTypeDisplayName(type)
+                        @DisplayHelper.GetTypeDisplayName(type)
                     </MudSelectItem>
                 }
             </MudSelect>
@@ -116,7 +115,7 @@
                 @if (_selectedType.HasValue)
                 {
                     <MudChip T="string" Size="Size.Small" OnClose="@(() => ClearTypeFilter())">
-                        @DocumentHelperService.GetTypeDisplayName(_selectedType.Value)
+                        @DisplayHelper.GetTypeDisplayName(_selectedType.Value)
                     </MudChip>
                 }
                 <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@ResetFilters">

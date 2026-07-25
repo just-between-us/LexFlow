@@ -1,5 +1,5 @@
-﻿using Lex.Application.DTOs;
-using Lex.Domain.DTOs;
+﻿using lex.Application.DTOs;
+using Lex.Application.DTOs;
 using Lex.Domain.Entities;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Identity;

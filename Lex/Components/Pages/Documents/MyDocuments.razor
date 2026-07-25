@@ -11,7 +11,6 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
-@inject IDocumentHelperService DocumentHelper
 
 
 <div class="py-4">
@@ -63,7 +62,7 @@
                     @foreach (var s in Enum.GetValues<DocumentStatus>())
                     {
                         <MudSelectItem Value="@((DocumentStatus?)s)">
-                            @DocumentHelper.GetStatusDisplayName(s)
+                            @DisplayHelper.GetStatusDisplayName(s)
                         </MudSelectItem>
                     }
                 </MudSelect>
@@ -79,7 +78,7 @@
                     @foreach (var p in Enum.GetValues<DocumentPrivacy>())
                     {
                         <MudSelectItem Value="@((DocumentPrivacy?)p)">
-                            @DocumentHelper.GetPrivacyDisplayName(p)
+                            @DisplayHelper.GetPrivacyDisplayName(p)
                         </MudSelectItem>
                     }
                 </MudSelect>
@@ -147,13 +146,13 @@
                     @if (_filterStatus.HasValue)
                     {
                         <MudChip T="string" Size="Size.Small" OnClose="@(() => ClearStatusFilter())">
-                            @DocumentHelper.GetStatusDisplayName(_filterStatus.Value)
+                            @DisplayHelper.GetStatusDisplayName(_filterStatus.Value)
                         </MudChip>
                     }
                     @if (_filterPrivacy.HasValue)
                     {
                         <MudChip T="string" Size="Size.Small" OnClose="@(() => ClearPrivacyFilter())">
-                            @DocumentHelper.GetPrivacyDisplayName(_filterPrivacy.Value)
+                            @DisplayHelper.GetPrivacyDisplayName(_filterPrivacy.Value)
                         </MudChip>
                     }
                     <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@ResetFilters">
@@ -208,7 +207,7 @@
                                 <MudCardContent Class="flex-grow-1">
                                     <div class="d-flex align-start justify-space-between mb-2 gap-2">
                                         <div class="d-flex align-center gap-2 min-w-0 flex-grow-1">
-                                            <MudIcon Icon="@DocumentHelper.GetTypeIcon(doc.Type)" Color="@DocumentHelper.GetTypeColor(doc.Type)" Class="flex-shrink-0" />
+                                            <MudIcon Icon="@DisplayHelper.GetTypeIcon(doc.Type)" Color="@DisplayHelper.GetTypeColor(doc.Type)" Class="flex-shrink-0" />
                                             <MudTooltip Text="@doc.Title" Arrow="true" Placement="Placement.Top">
                                                 <MudText Typo="Typo.h6" Class="card-title mud-text-truncate">
                                                     @doc.Title
@@ -235,16 +234,16 @@
                                     </div>
 
                                     <div class="d-flex flex-wrap gap-1 mb-2">
-                                        <MudChip T="string" Size="Size.Small" Color="@DocumentHelper.GetStatusColor(doc.Status)" Variant="Variant.Text">
-                                            @DocumentHelper.GetStatusDisplayName(doc.Status)
+                                        <MudChip T="string" Size="Size.Small" Color="@DisplayHelper.GetStatusColor(doc.Status)" Variant="Variant.Text">
+                                            @DisplayHelper.GetStatusDisplayName(doc.Status)
                                         </MudChip>
-                                        <MudChip T="string" Size="Size.Small" Color="@DocumentHelper.GetTypeColor(doc.Type)" Variant="Variant.Outlined">
-                                            @DocumentHelper.GetTypeDisplayName(doc.Type)
+                                        <MudChip T="string" Size="Size.Small" Color="@DisplayHelper.GetTypeColor(doc.Type)" Variant="Variant.Outlined">
+                                            @DisplayHelper.GetTypeDisplayName(doc.Type)
                                         </MudChip>
                                         @if (doc.Privacy != DocumentPrivacy.Private)
                                         {
                                             <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">
-                                                @DocumentHelper.GetPrivacyDisplayName(doc.Privacy)
+                                                @DisplayHelper.GetPrivacyDisplayName(doc.Privacy)
                                             </MudChip>
                                         }
                                     </div>
@@ -332,7 +331,7 @@
     private int _currentPage = 1;
     private int _totalPages = 1;
     private int _totalCount;
-    private int _pageSize = 12;
+    private readonly int _pageSize = 12;
 
     private string _searchQuery = string.Empty;
     private DocumentStatus? _filterStatus;
@@ -340,14 +339,14 @@
 
     // Параметры сортировки
     private string _sortField = "Date";
-    private bool _sortAscending = false; // по умолчанию свежие сверху
+    private bool _sortAscending; // по умолчанию свежие сверху
     private static readonly (string Field, string Label)[] SortOptions =
-    {
+    [
         ("Date", "По дате"),
         ("Title", "По названию"),
         ("Status", "По статусу"),
         ("Type", "По типу")
-    };
+    ];
 
     private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_searchQuery) || _filterStatus.HasValue || _filterPrivacy.HasValue;
 
@@ -454,7 +453,7 @@
         else
         {
             _sortField = field;
-            _sortAscending = field == "Date" ? false : true; // для даты убывание по умолчанию
+            _sortAscending = field != "Date"; // для даты убывание по умолчанию
         }
         _currentPage = 1;
         _ = LoadData();

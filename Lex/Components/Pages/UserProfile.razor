@@ -1,11 +1,11 @@
 ﻿@page "/profile"
 @implements IDisposable
 @attribute [Authorize]
+@using lex.Application.DTOs
+@using lex.Application.Interfaces
 @using Lex.Components.Auth
 @using Lex.Components.Utils
-@using Lex.Domain.DTOs
 @using Lex.Domain.Enums
-@using Lex.Domain.Interfaces
 @using Microsoft.AspNetCore.Authorization
 @inject IUserProfileService ProfileService
 @inject UserContext UserContext

@@ -29,6 +29,7 @@
 
 
     <ItemGroup>
+      <ProjectReference Include="..\lex.Application\lex.Application.csproj" />
       <ProjectReference Include="..\Lex.Infrastructure\Lex.Infrastructure.csproj" />
     </ItemGroup>
 

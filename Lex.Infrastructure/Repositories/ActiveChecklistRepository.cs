@@ -1,5 +1,4 @@
 ﻿using Lex.Domain.Entities;
-using Lex.Domain.Interfaces;
 using Lex.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 

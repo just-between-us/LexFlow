@@ -1,10 +1,10 @@
 ﻿@page "/organization"
 @implements IDisposable
 @attribute [Authorize]
+@using lex.Application.DTOs
+@using lex.Application.Interfaces
 @using Lex.Components.Auth
-@using Lex.Domain.DTOs
 @using Lex.Domain.Enums
-@using Lex.Domain.Interfaces
 @using Microsoft.AspNetCore.Authorization
 @inject IClientOrganizationService OrgService
 @inject UserContext UserContext
