@@ -39,12 +39,12 @@
                 <MudText Typo="Typo.body1" Class="text-muted mt-1">@_document.Title</MudText>
 
                 <div class="d-flex align-center gap-2 flex-wrap mt-2">
-                    <MudTooltip Text="@GetStatusDescription(_document.Status)">
-                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_document.Status)" Variant="Variant.Filled">
+                    <MudTooltip Text="@DisplayHelper.GetStatusDescription(_document.Status)">
+                        <MudChip T="string" Size="Size.Small" Color="@DisplayHelper.GetStatusColor(_document.Status)" Variant="Variant.Filled">
                             @DisplayHelper.GetStatusDisplayName(_document.Status)
                         </MudChip>
                     </MudTooltip>
-                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@DisplayHelper.GetTypeColor(_document.Type)" >
                         @DisplayHelper.GetTypeDisplayName(_document.Type)
                     </MudChip>
                     <MudTooltip Text="Номер версии, которая сейчас считается основной для документа">
@@ -125,7 +125,7 @@
                             Влияет на то, где и кому виден документ
                         </MudText>
 
-                        <MudTooltip Text="@GetStatusDescription(_editStatus)" Placement="Placement.Top" RootClass="d-block mb-4">
+                        <MudTooltip Text="@DisplayHelper.GetStatusDescription(_editStatus)" Placement="Placement.Top" RootClass="d-block mb-4">
                             <MudSelect Value="_editStatus"
                                        ValueChanged="OnStatusChanged"
                                        Label="Статус документа" T="DocumentStatus"
@@ -323,7 +323,7 @@
                                     @version.ChangeSummary
                                 </MudText>
                             }
-                            <MudText Typo="Typo.caption" Class="text-muted">@GetRelativeTime(version.CreatedAtUtc)</MudText>
+                            <MudText Typo="Typo.caption" Class="text-muted">@DisplayHelper.GetRelativeTime(version.CreatedAtUtc)</MudText>
                         </div>
                         @if (isEditing)
                         {
@@ -552,44 +552,9 @@
         return Markdown.ToHtml(markdown ?? string.Empty, pipeline);
     }
 
-    private static Color GetStatusColor(DocumentStatus status) => status switch
-    {
-        DocumentStatus.Draft => Color.Default,
-        DocumentStatus.InReview => Color.Info,
-        DocumentStatus.Ready => Color.Primary,
-        DocumentStatus.Signed => Color.Success,
-        DocumentStatus.Archived => Color.Dark,
-        DocumentStatus.Deleted => Color.Error,
-        _ => Color.Default
-    };
-
     private static string GetStatusDotStyle(DocumentStatus status)
     {
-        var color = GetStatusColor(status);
+        var color = DisplayHelper.GetStatusColor(status);
         return $"background-color: var(--mud-palette-{color.ToString().ToLowerInvariant()});";
-    }
-
-    private static string GetStatusDescription(DocumentStatus status) => status switch
-    {
-        DocumentStatus.Draft => "Черновик — документ в разработке, не готов к использованию",
-        DocumentStatus.InReview => "На проверке — ожидает согласования",
-        DocumentStatus.Ready => "Готов — прошёл проверку, можно использовать",
-        DocumentStatus.Signed => "Подписан — юридически финализирован, дата фиксируется автоматически",
-        DocumentStatus.Archived => "В архиве — скрыт из активных списков, но доступен по прямой ссылке",
-        DocumentStatus.Deleted => "Удалён",
-        _ => ""
-    };
-
-    private static string GetRelativeTime(DateTime utc)
-    {
-        var span = DateTime.UtcNow - utc;
-        return span switch
-        {
-            { TotalMinutes: < 1 } => "только что",
-            { TotalMinutes: < 60 } => $"{(int)span.TotalMinutes} мин. назад",
-            { TotalHours: < 24 } => $"{(int)span.TotalHours} ч. назад",
-            { TotalDays: < 7 } => $"{(int)span.TotalDays} дн. назад",
-            _ => utc.ToLocalTime().ToString("dd.MM.yyyy")
-        };
     }
 }

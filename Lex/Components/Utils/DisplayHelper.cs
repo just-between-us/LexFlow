@@ -28,11 +28,12 @@ public static class DisplayHelper
 
     public static Color GetStatusColor(DocumentStatus status) => status switch
     {
-        DocumentStatus.Draft => Color.Secondary,
+        DocumentStatus.Draft => Color.Default,
         DocumentStatus.InReview => Color.Info,
-        DocumentStatus.Ready => Color.Success,
-        DocumentStatus.Signed => Color.Primary,
-        DocumentStatus.Archived => Color.Warning,
+        DocumentStatus.Ready => Color.Primary,
+        DocumentStatus.Signed => Color.Success,
+        DocumentStatus.Archived => Color.Dark,
+        DocumentStatus.Deleted => Color.Error,
         _ => Color.Default
     };
 
@@ -73,4 +74,26 @@ public static class DisplayHelper
         DocumentType.Consent => Icons.Material.Filled.HowToReg,
         _ => Icons.Material.Filled.InsertDriveFile
     };
+    public static string GetStatusDescription(DocumentStatus status) => status switch
+    {
+        DocumentStatus.Draft => "Черновик — документ в разработке, не готов к использованию",
+        DocumentStatus.InReview => "На проверке — ожидает согласования",
+        DocumentStatus.Ready => "Готов — прошёл проверку, можно использовать",
+        DocumentStatus.Signed => "Подписан — юридически финализирован, дата фиксируется автоматически",
+        DocumentStatus.Archived => "В архиве — скрыт из активных списков, но доступен по прямой ссылке",
+        DocumentStatus.Deleted => "Удалён",
+        _ => ""
+    };
+    public static string GetRelativeTime(DateTime utc)
+    {
+        var span = DateTime.UtcNow - utc;
+        return span switch
+        {
+            { TotalMinutes: < 1 } => "только что",
+            { TotalMinutes: < 60 } => $"{(int)span.TotalMinutes} мин. назад",
+            { TotalHours: < 24 } => $"{(int)span.TotalHours} ч. назад",
+            { TotalDays: < 7 } => $"{(int)span.TotalDays} дн. назад",
+            _ => utc.ToLocalTime().ToString("dd.MM.yyyy")
+        };
+    }
 }
