@@ -31,6 +31,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IClientOrganizationService, ClientOrganizationService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IOrganizationPublicService, OrganizationPublicService>();
+        services.AddScoped<IDocumentEditingService, DocumentEditingService>();
         return services;
     }
 
