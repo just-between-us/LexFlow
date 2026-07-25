@@ -1267,3 +1267,43 @@ html {
     transform: translateY(-4px);
     box-shadow: var(--nav-shadow) !important;
 }
+.preview-card {
+    position: sticky;
+    top: 16px;
+}
+
+.markdown-preview {
+    max-height: 640px;
+    overflow-y: auto;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.pulse-chip {
+    animation: pulse-opacity 1.6s ease-in-out infinite;
+}
+@keyframes pulse-opacity {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.version-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+.version-item:hover {
+    background-color: var(--mud-palette-action-default-hover);
+}
+.version-item-active {
+    background-color: rgba(var(--mud-palette-primary-rgb), 0.08);
+}

@@ -32,4 +32,5 @@ public class DocumentFieldsUpdateModel
     public string Description { get; set; } = string.Empty;
     public DocumentType Type { get; set; }
     public DocumentPrivacy Privacy { get; set; }
+    public DocumentStatus Status { get; set; }
 }

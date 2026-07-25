@@ -17,7 +17,12 @@
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-8">
     @if (_isLoading)
     {
-        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-8" />
+        <MudSkeleton Width="60%" Height="40px" Class="mb-2" />
+        <MudSkeleton Width="30%" Height="24px" Class="mb-6" />
+        <MudGrid>
+            <MudItem xs="12" md="6"><MudSkeleton Width="100%" Height="480px" Class="rounded-lg" /></MudItem>
+            <MudItem xs="12" md="6"><MudSkeleton Width="100%" Height="480px" Class="rounded-lg" /></MudItem>
+        </MudGrid>
     }
     else if (_document == null)
     {
@@ -28,35 +33,53 @@
     else
     {
         <!-- Заголовок -->
-        <div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
+        <div class="d-flex align-start justify-space-between mb-6 flex-wrap gap-3">
             <div>
-                <MudText Typo="Typo.h4">Редактирование: @_document.Title</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    @DisplayHelper.GetStatusDisplayName(_document.Status) ·
-                    @DisplayHelper.GetTypeDisplayName(_document.Type) ·
-                    Актуальная версия: v.@_document.CurrentVersionNumber
+                <MudText Typo="Typo.h4">Редактирование документа</MudText>
+                <MudText Typo="Typo.body1" Class="text-muted mt-1">@_document.Title</MudText>
+
+                <div class="d-flex align-center gap-2 flex-wrap mt-2">
+                    <MudTooltip Text="@GetStatusDescription(_document.Status)">
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_document.Status)" Variant="Variant.Filled">
+                            @DisplayHelper.GetStatusDisplayName(_document.Status)
+                        </MudChip>
+                    </MudTooltip>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">
+                        @DisplayHelper.GetTypeDisplayName(_document.Type)
+                    </MudChip>
+                    <MudTooltip Text="Номер версии, которая сейчас считается основной для документа">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Filled.Bookmark">
+                            Актуальная: v@(_document.CurrentVersionNumber)
+                        </MudChip>
+                    </MudTooltip>
                     @if (_hasUnsavedChanges)
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Warning" Class="ml-2">
-                            Несохранённые изменения
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text"
+                                 Icon="@Icons.Material.Filled.FiberManualRecord" Class="pulse-chip">
+                            Есть несохранённые изменения
                         </MudChip>
                     }
-                </MudText>
+                </div>
+
                 @if (_document.TemplateId != null)
                 {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
-                        <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Size="Size.Small" Class="mr-1" />
-                        <a href="@($"/templates/view/{_document.TemplateId}")" class="text-primary">Перейти к шаблону</a>
+                    <MudText Typo="Typo.caption" Class="text-muted d-flex align-center gap-1 mt-2">
+                        <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Size="Size.Small" />
+                        Создан на основе шаблона —
+                        <a href="@($"/templates/view/{_document.TemplateId}")" class="text-primary">открыть шаблон</a>
                     </MudText>
                 }
             </div>
+
             <div class="d-flex gap-2">
-                <MudButton Variant="Variant.Text" Color="Color.Secondary"
-                           StartIcon="@Icons.Material.Filled.Visibility"
-                           Href="@($"/documents/{Id}")">
-                    Просмотр
-                </MudButton>
-                <MudTooltip Text="История версий">
+                <MudTooltip Text="Вернуться к просмотру без сохранения">
+                    <MudButton Variant="Variant.Text" Color="Color.Secondary"
+                               StartIcon="@Icons.Material.Filled.Visibility"
+                               Href="@($"/documents/{Id}")">
+                        Просмотр
+                    </MudButton>
+                </MudTooltip>
+                <MudTooltip Text="@($"Всего версий: {_document.Versions.Count}. Открыть историю")">
                     <MudIconButton Icon="@Icons.Material.Filled.History"
                                    Color="Color.Inherit"
                                    OnClick="@ToggleVersionPanel" />
@@ -64,62 +87,147 @@
             </div>
         </div>
 
-        <!-- Редактор и предпросмотр -->
         <MudGrid>
             <MudItem xs="12" md="6">
-                <MudCard Elevation="1" Class="mb-4">
+                <!-- Метаданные -->
+                <MudCard Elevation="1" Class="mb-4 section-card">
                     <MudCardContent>
-                        @if (_editingVersion != null) 
-                        { 
-                            <div class="mb-4 d-flex gap-2">
-                                <MudText Typo="Typo.h6">Выбранная для редактирования версия:</MudText>
-                                <MudText Typo="Typo.h6" Color=" Color.Primary">v.@_editingVersion.VersionNumber</MudText>
-                            </div>
-                            
-                        }
+                        <MudText Typo="Typo.h6" Class="mb-1 d-flex align-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Small" />
+                            Основная информация 
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="text-muted mb-4">
+                            Название и описание видны в каталоге и списках документов
+                        </MudText>
+
                         <MudTextField @bind-Value="_editTitle" Label="Название" Required="true"
-                                      T="string" Class="mb-3" Immediate="true"
-                                      OnKeyUp="(e) => MarkChanged()" />
+                                      T="string" Variant="Variant.Outlined"
+                                      MaxLength="200" Counter="200"
+                                      HelperText="Кратко и по делу — станет заголовком документа"
+                                      Immediate="true" OnKeyUp="(e) => MarkChanged()" Class="mb-4" />
+
                         <MudTextField @bind-Value="_editDescription" Label="Описание"
-                                      Lines="2" T="string" Class="mb-3" Immediate="true"
-                                      OnKeyUp="(e) => MarkChanged()" />
+                                      Lines="2" T="string" Variant="Variant.Outlined"
+                                      MaxLength="2000" Counter="2000"
+                                      HelperText="Необязательно — краткая аннотация для списка документов"
+                                      Immediate="true" OnKeyUp="(e) => MarkChanged()" />
+                    </MudCardContent>
+                </MudCard>
+
+                <!-- Статус и классификация -->
+                <MudCard Elevation="1" Class="mb-4 section-card">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6" Class="mb-1 d-flex align-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Small" />
+                            Статус и классификация
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="text-muted mb-4">
+                            Влияет на то, где и кому виден документ
+                        </MudText>
+
+                        <MudTooltip Text="@GetStatusDescription(_editStatus)" Placement="Placement.Top" RootClass="d-block mb-4">
+                            <MudSelect Value="_editStatus"
+                                       ValueChanged="OnStatusChanged"
+                                       Label="Статус документа" T="DocumentStatus"
+                                       Variant="Variant.Outlined"
+                                       AdornmentIcon="@Icons.Material.Filled.HelpOutline" Adornment="Adornment.End">
+                                @foreach (var status in SelectableStatuses)
+                                {
+                                    <MudSelectItem Value="status">
+                                        <div class="d-flex align-center gap-2">
+                                            <div class="status-dot" style="@GetStatusDotStyle(status)"></div>
+                                            @DisplayHelper.GetStatusDisplayName(status)
+                                        </div>
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudTooltip>
+
+                        @if (_editStatus == DocumentStatus.Archived && _document.Status != DocumentStatus.Archived)
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4" Icon="@Icons.Material.Filled.Inventory2">
+                                После сохранения документ пропадёт из активных списков, но останется доступен по ссылке
+                            </MudAlert>
+                        }
+                        @if (_editStatus == DocumentStatus.Signed && _document.Status != DocumentStatus.Signed)
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4" Icon="@Icons.Material.Filled.Verified">
+                                Дата подписания будет зафиксирована текущим моментом
+                            </MudAlert>
+                        }
 
                         <MudSelect Value="_editType"
                                    ValueChanged="(v) => { _editType = v; MarkChanged(); }"
-                                   Label="Тип" T="DocumentType" Class="mb-3">
+                                   Label="Тип документа" T="DocumentType"
+                                   Variant="Variant.Outlined"
+                                   Class="mb-4">
                             @foreach (var type in Enum.GetValues<DocumentType>())
                             {
                                 <MudSelectItem Value="type">@DisplayHelper.GetTypeDisplayName(type)</MudSelectItem>
                             }
                         </MudSelect>
 
-                        <MudSelect Value="_editPrivacy"
-                                   ValueChanged="(v) => { _editPrivacy = v; MarkChanged(); }"
-                                   Label="Видимость" T="DocumentPrivacy" Class="mb-3">
-                            @foreach (var p in Enum.GetValues<DocumentPrivacy>())
-                            {
-                                <MudSelectItem Value="p">@DisplayHelper.GetPrivacyDisplayName(p)</MudSelectItem>
-                            }
-                        </MudSelect>
+                        <MudTooltip Text="Определяет, кто ещё сможет увидеть этот документ" Placement="Placement.Top" RootClass="d-block">
+                            <MudSelect Value="_editPrivacy"
+                                       ValueChanged="(v) => { _editPrivacy = v; MarkChanged(); }"
+                                       Label="Видимость" T="DocumentPrivacy"
+                                       Variant="Variant.Outlined"
+                                       AdornmentIcon="@Icons.Material.Filled.HelpOutline" Adornment="Adornment.End">
+                                @foreach (var p in Enum.GetValues<DocumentPrivacy>())
+                                {
+                                    <MudSelectItem Value="p">@DisplayHelper.GetPrivacyDisplayName(p)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudTooltip>
+                    </MudCardContent>
+                </MudCard>
 
-                        <MudTextField @bind-Value="_editContent" Label="Содержимое (Markdown)"
-                                      Lines="15" T="string" Immediate="true"
-                                      OnKeyUp="(e) => MarkChanged()" />
+                <!-- Содержимое -->
+                <MudCard Elevation="1" Class="mb-4 section-card">
+                    <MudCardContent>
+                        <div class="d-flex align-center justify-space-between mb-1">
+                            <MudText Typo="Typo.h6" Class="d-flex align-center gap-1">
+                                <MudIcon Icon="@Icons.Material.Filled.Article" Size="Size.Small" />
+                                Содержимое
+                            </MudText>
+                            <MudTooltip Text="Поддерживается Markdown: **жирный**, *курсив*, списки, таблицы, ссылки">
+                                <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="text-muted" />
+                            </MudTooltip>
+                        </div>
+                        <MudText Typo="Typo.caption" Class="text-muted mb-4">
+                            Редактируется @(_editingVersion is not null ? $"версия v{_editingVersion.VersionNumber}" : "")
+                            @if (_editingVersion?.VersionNumber != _document.CurrentVersionNumber)
+                            {
+                                <span class="text-warning"> — это не актуальная версия</span>
+                            }
+                        </MudText>
+
+                        <MudTextField @key="@(_editingVersion?.Id ?? Guid.Empty)"
+                                      @bind-Value="_editContent" Label="Markdown"
+                                      Lines="15" T="string" Variant="Variant.Outlined"
+                                      MaxLength="150000" Counter="150000"
+                                      Immediate="true" OnKeyUp="(e) => MarkChanged()" />
                     </MudCardContent>
                 </MudCard>
             </MudItem>
 
             <MudItem xs="12" md="6">
-                <MudCard Elevation="1" Class="h-100">
+                <MudCard Elevation="1" Class="preview-card section-card">
                     <MudCardHeader>
                         <CardHeaderContent>
-                            <MudText Typo="Typo.h6">Предпросмотр</MudText>
+                            <MudText Typo="Typo.h6" Class="d-flex align-center gap-1">
+                                <MudIcon Icon="@Icons.Material.Filled.RemoveRedEye" Size="Size.Small" />
+                                Предпросмотр
+                            </MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent Class="markdown-preview">
                         @if (string.IsNullOrWhiteSpace(_editContent))
                         {
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Начните вводить текст...</MudText>
+                            <div class="text-center py-8">
+                                <MudIcon Icon="@Icons.Material.Filled.EditNote" Size="Size.Large" Class="mb-2 text-muted" />
+                                <MudText Typo="Typo.body2" Class="text-muted">Начните вводить текст слева — предпросмотр появится здесь</MudText>
+                            </div>
                         }
                         else
                         {
@@ -130,55 +238,99 @@
             </MudItem>
         </MudGrid>
 
-        <!-- Кнопки сохранения -->
-        <div class="d-flex flex-wrap gap-2 justify-space-between mt-4">
-            <div class="d-flex gap-2">
-                <MudTooltip Text="Сохранить изменения (выбор стратегии)">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                               OnClick="Save"
-                               StartIcon="@Icons.Material.Filled.Save"
-                               Disabled="@(!_hasUnsavedChanges || _isSaving)">
-                        Сохранить
-                    </MudButton>
-                </MudTooltip>
-                <MudTooltip Text="Создать новую версию на основе текущей">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                               OnClick="SaveAsNewVersion"
-                               StartIcon="@Icons.Material.Filled.Add"
-                               Disabled="@(!_hasUnsavedChanges || _isSaving)">
-                        Сохранить как новую версию
-                    </MudButton>
-                </MudTooltip>
-            </div>
-            <MudTooltip Text="Отменить редактирование и вернуться к просмотру">
-                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Cancel">
-                    Отмена
+        <!-- Панель действий -->
+        <div class="d-flex flex-wrap align-center gap-2 sticky-actions pa-3 rounded-lg mt-4">
+            <MudTooltip Text="Сохранить изменения — вы выберете, обновить текущую версию или создать новую">
+                <MudButton Variant="Variant.Filled"
+                           Color="@(_saveState == SaveState.Success ? Color.Success : Color.Primary)"
+                           OnClick="Save"
+                           Disabled="@(!_hasUnsavedChanges || _isSaving)"
+                           Class="save-button">
+                    @if (_saveState == SaveState.Saving)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Сохранение...</span>
+                    }
+                    else if (_saveState == SaveState.Success)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Class="mr-1" />
+                        <span>Сохранено</span>
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Save" Size="Size.Small" Class="mr-1" />
+                        <span>Сохранить</span>
+                    }
                 </MudButton>
             </MudTooltip>
+
+            <MudTooltip Text="Текущая версия останется без изменений, создастся новая на основе введённого текста">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           OnClick="SaveAsNewVersion"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           Disabled="@(!_hasUnsavedChanges || _isSaving)">
+                    Сохранить как новую версию
+                </MudButton>
+            </MudTooltip>
+
+            <MudSpacer />
+
+            @if (_hasUnsavedChanges && !_isSaving)
+            {
+                <MudText Typo="Typo.caption" Class="text-muted mr-2">Изменения не сохранены</MudText>
+            }
+
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Cancel">
+                Отмена
+            </MudButton>
         </div>
     }
 </MudContainer>
 
-<!-- Панель выбора версий -->
+<!-- Панель версий -->
 @if (_versionPanelVisible)
 {
     <div class="version-panel-overlay" @onclick="CloseVersionPanel">
         <div class="version-panel" @onclick:stopPropagation="true">
             <div class="d-flex align-center justify-space-between pa-3 border-bottom">
-                <MudText Typo="Typo.h6">История версий</MudText>
-                <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@CloseVersionPanel" Size="Size.Small"/>
+                <div>
+                    <MudText Typo="Typo.h6">История версий</MudText>
+                    <MudText Typo="Typo.caption" Class="text-muted">@_document!.Versions.Count версий всего</MudText>
+                </div>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@CloseVersionPanel" Size="Size.Small" />
             </div>
             <div class="version-list-container px-2 py-2">
-                <MudList T="DocumentVersionSummaryDto">
-                    @foreach (var version in _document!.Versions)
-                    {
-                        <MudListItem Text="@($"v{version.VersionNumber} — {version.CreatedByName}")"
-                                     SecondaryText="@version.CreatedAtUtc.ToString("g")"
-                                     Icon="@(version.Id == _editingVersion?.Id ? Icons.Material.Filled.Edit : Icons.Material.Filled.Circle)"
-                                     OnClick="@(() => SelectVersion(version))"
-                                     Class="@(version.Id == _editingVersion?.Id ? "active-version" : "")" />
-                    }
-                </MudList>
+                @foreach (var version in _document.Versions)
+                {
+                    var isCurrent = version.VersionNumber == _document.CurrentVersionNumber;
+                    var isEditing = version.Id == _editingVersion?.Id;
+
+                    <div class="version-item @(isEditing ? "version-item-active" : "")" @onclick="@(() => SelectVersion(version))">
+                        <MudAvatar Size="Size.Small" Color="@(isCurrent ? Color.Primary : Color.Default)">
+                            v@(version.VersionNumber)
+                        </MudAvatar>
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-center gap-1 flex-wrap">
+                                <MudText Typo="Typo.body2">@version.CreatedByName</MudText>
+                                @if (isCurrent)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">Актуальная</MudChip>
+                                }
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(version.ChangeSummary))
+                            {
+                                <MudText Typo="Typo.caption" Class="text-muted d-block text-truncate" Style="max-width: 260px;">
+                                    @version.ChangeSummary
+                                </MudText>
+                            }
+                            <MudText Typo="Typo.caption" Class="text-muted">@GetRelativeTime(version.CreatedAtUtc)</MudText>
+                        </div>
+                        @if (isEditing)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" />
+                        }
+                    </div>
+                }
             </div>
         </div>
     </div>
@@ -194,12 +346,18 @@
     private bool _hasUnsavedChanges;
     private bool _versionPanelVisible;
     private Guid? _currentUserId;
+    private SaveState _saveState = SaveState.Idle;
+    private enum SaveState { Idle, Saving, Success }
 
     private string _editTitle = "";
     private string _editDescription = "";
     private DocumentType _editType;
     private DocumentPrivacy _editPrivacy;
+    private DocumentStatus _editStatus;
     private string _editContent = "";
+
+    private static readonly DocumentStatus[] SelectableStatuses =
+        Enum.GetValues<DocumentStatus>().Where(s => s != DocumentStatus.Deleted).ToArray();
 
     protected override async Task OnInitializedAsync()
     {
@@ -225,6 +383,7 @@
             _editDescription = _document.Description;
             _editType = _document.Type;
             _editPrivacy = _document.Privacy;
+            _editStatus = _document.Status;
             _hasUnsavedChanges = false;
         }
         finally
@@ -234,11 +393,21 @@
         }
     }
 
-    private void MarkChanged() => _hasUnsavedChanges = true;
+    private void MarkChanged()
+    {
+        _hasUnsavedChanges = true;
+        if (_saveState == SaveState.Success) _saveState = SaveState.Idle;
+    }
+
+    private void OnStatusChanged(DocumentStatus value)
+    {
+        _editStatus = value;
+        MarkChanged();
+    }
 
     private void SelectVersion(DocumentVersionSummaryDto version)
     {
-        _hasUnsavedChanges = false; // переключение версии сбрасывает несохранённый черновик — как и раньше
+        _hasUnsavedChanges = false;
         _editingVersion = version;
         _editContent = version.Content;
         _versionPanelVisible = false;
@@ -290,70 +459,81 @@
             Snackbar.Add("Неверный выбор", Severity.Warning);
     }
 
+    private DocumentFieldsUpdateModel BuildFieldsModel() => new()
+    {
+        Title = _editTitle,
+        Description = _editDescription,
+        Type = _editType,
+        Privacy = _editPrivacy,
+        Status = _editStatus
+    };
+
     private async Task CreateNewVersion(string? changeSummary)
     {
         if (_document is null || _currentUserId is null) return;
+        _saveState = SaveState.Saving;
         _isSaving = true;
+        StateHasChanged();
         try
         {
-            var fields = new DocumentFieldsUpdateModel
-            {
-                Title = _editTitle,
-                Description = _editDescription,
-                Type = _editType,
-                Privacy = _editPrivacy
-            };
-
             _document = await DocumentEditingService.CreateNewVersionAsync(
                 _document.Id, _currentUserId.Value, _editingVersion?.VersionNumber ?? 0,
-                fields, _editContent, changeSummary);
+                BuildFieldsModel(), _editContent, changeSummary);
 
             Snackbar.Add($"Создана новая версия v{_document.CurrentVersionNumber}", Severity.Success);
-            _hasUnsavedChanges = false;
-            _editingVersion = _document.Versions.First(v => v.VersionNumber == _document.CurrentVersionNumber);
-            _editContent = _editingVersion.Content;
+            FinishSave(_document.Versions.First(v => v.VersionNumber == _document.CurrentVersionNumber));
         }
         catch (Exception ex)
         {
+            _saveState = SaveState.Idle;
             Snackbar.Add($"Ошибка сохранения: {ex.Message}", Severity.Error);
         }
         finally
         {
             _isSaving = false;
+            StateHasChanged();
         }
     }
 
     private async Task UpdateExistingVersion(string? changeSummary)
     {
         if (_document is null || _currentUserId is null || _editingVersion is null) return;
+        _saveState = SaveState.Saving;
         _isSaving = true;
+        StateHasChanged();
         try
         {
-            var fields = new DocumentFieldsUpdateModel
-            {
-                Title = _editTitle,
-                Description = _editDescription,
-                Type = _editType,
-                Privacy = _editPrivacy
-            };
-
+            var versionId = _editingVersion.Id;
             _document = await DocumentEditingService.UpdateExistingVersionAsync(
-                _document.Id, _currentUserId.Value, _editingVersion.Id,
-                fields, _editContent, changeSummary);
+                _document.Id, _currentUserId.Value, versionId,
+                BuildFieldsModel(), _editContent, changeSummary);
 
             Snackbar.Add($"Версия v{_editingVersion.VersionNumber} обновлена", Severity.Success);
-            _hasUnsavedChanges = false;
-            _editingVersion = _document.Versions.First(v => v.Id == _editingVersion.Id);
-            _editContent = _editingVersion.Content;
+            FinishSave(_document.Versions.First(v => v.Id == versionId));
         }
         catch (Exception ex)
         {
+            _saveState = SaveState.Idle;
             Snackbar.Add($"Ошибка сохранения: {ex.Message}", Severity.Error);
         }
         finally
         {
             _isSaving = false;
+            StateHasChanged();
         }
+    }
+
+    private async void FinishSave(DocumentVersionSummaryDto updatedVersion)
+    {
+        _hasUnsavedChanges = false;
+        _editingVersion = updatedVersion;
+        _editContent = updatedVersion.Content;
+        _saveState = SaveState.Success;
+        StateHasChanged();
+
+        await Task.Delay(1600);
+        if (_saveState == SaveState.Success) _saveState = SaveState.Idle;
+        StateHasChanged();
     }
 
     private bool HasDocumentFieldChanges() =>
@@ -361,7 +541,8 @@
         (_editTitle != _document.Title ||
          _editDescription != _document.Description ||
          _editType != _document.Type ||
-         _editPrivacy != _document.Privacy);
+         _editPrivacy != _document.Privacy ||
+         _editStatus != _document.Status);
 
     private void Cancel() => Navigation.NavigateTo($"/documents/{Id}");
 
@@ -369,5 +550,46 @@
     {
         var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
         return Markdown.ToHtml(markdown ?? string.Empty, pipeline);
+    }
+
+    private static Color GetStatusColor(DocumentStatus status) => status switch
+    {
+        DocumentStatus.Draft => Color.Default,
+        DocumentStatus.InReview => Color.Info,
+        DocumentStatus.Ready => Color.Primary,
+        DocumentStatus.Signed => Color.Success,
+        DocumentStatus.Archived => Color.Dark,
+        DocumentStatus.Deleted => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string GetStatusDotStyle(DocumentStatus status)
+    {
+        var color = GetStatusColor(status);
+        return $"background-color: var(--mud-palette-{color.ToString().ToLowerInvariant()});";
+    }
+
+    private static string GetStatusDescription(DocumentStatus status) => status switch
+    {
+        DocumentStatus.Draft => "Черновик — документ в разработке, не готов к использованию",
+        DocumentStatus.InReview => "На проверке — ожидает согласования",
+        DocumentStatus.Ready => "Готов — прошёл проверку, можно использовать",
+        DocumentStatus.Signed => "Подписан — юридически финализирован, дата фиксируется автоматически",
+        DocumentStatus.Archived => "В архиве — скрыт из активных списков, но доступен по прямой ссылке",
+        DocumentStatus.Deleted => "Удалён",
+        _ => ""
+    };
+
+    private static string GetRelativeTime(DateTime utc)
+    {
+        var span = DateTime.UtcNow - utc;
+        return span switch
+        {
+            { TotalMinutes: < 1 } => "только что",
+            { TotalMinutes: < 60 } => $"{(int)span.TotalMinutes} мин. назад",
+            { TotalHours: < 24 } => $"{(int)span.TotalHours} ч. назад",
+            { TotalDays: < 7 } => $"{(int)span.TotalDays} дн. назад",
+            _ => utc.ToLocalTime().ToString("dd.MM.yyyy")
+        };
     }
 }

@@ -1,6 +1,7 @@
 ﻿using lex.Application.DTOs;
 using lex.Application.Interfaces;
 using Lex.Domain.Entities;
+using Lex.Domain.Enums;
 using Lex.Infrastructure.Repositories;
 
 namespace lex.Application.Services;
@@ -44,7 +45,8 @@ public class DocumentEditingService : IDocumentEditingService
             ChangeSummary = changeSummary ?? $"Создана на основе версии {basedOnVersionNumber}",
             VersionCreatedByUserId = userId
         };
-
+        
+        ApplyStatusChange(document, fields.Status);
         document.Title = fields.Title;
         document.Description = fields.Description;
         document.Type = fields.Type;
@@ -78,6 +80,7 @@ public class DocumentEditingService : IDocumentEditingService
         // поля документа обновляются, только если правится актуальная версия или можно случайно перезаписать заголовок черновиком из старой версии
         if (version.VersionNumber == document.CurrentVersionNumber)
         {
+            ApplyStatusChange(document, fields.Status);
             document.Title = fields.Title;
             document.Description = fields.Description;
             document.Type = fields.Type;
@@ -116,4 +119,16 @@ public class DocumentEditingService : IDocumentEditingService
             })
             .ToList()
     };
+    private static void ApplyStatusChange(Document document, DocumentStatus newStatus)
+    {
+        if (document.Status == newStatus) return;
+
+        if (newStatus == DocumentStatus.Signed)
+            document.SignedAtUtc = DateTime.UtcNow;
+
+        if (newStatus == DocumentStatus.Archived)
+            document.ArchivedAtUtc = DateTime.UtcNow;
+
+        document.Status = newStatus;
+    }
 }
