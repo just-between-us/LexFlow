@@ -94,7 +94,7 @@
     }
     else if (_activity is not null)
     {
-        <MudPaper Class="pa-4 rounded-lg mb-2" Elevation="0">
+        <MudPaper Class="pa-4 rounded-lg mb-2" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
             <div class="d-flex justify-space-between align-center mb-3 flex-wrap gap-2">
                 <MudText Typo="Typo.body2" Class="text-muted">
                     @_activity.TotalEventsInRange событий за последний год
@@ -211,11 +211,11 @@
     {
         <MudGrid Class="mb-6">
             <MudItem xs="12" md="6">
-                <MudPaper Class="pa-4 rounded-lg stat-card h-100" Elevation="0">
+                <MudPaper Class="pa-4 rounded-lg d-flex flex-column stat-card h-100" Elevation="0" Style="height: 100%">
                     <MudText Typo="Typo.subtitle2" Class="mb-3 d-flex align-center gap-1">
                         <MudIcon Icon="@Icons.Material.Filled.Checklist" Size="Size.Small" /> Чек-листы
                     </MudText>
-                    <div class="d-flex align-center gap-4">
+                    <div class="d-flex align-center gap-4" style="height: 100%">
                         <MudProgressCircular Value="@checklists.CompletionRatePercent" Size="Size.Large" Color="Color.Primary" StrokeWidth="6">
                             <MudText Typo="Typo.body2">@($"{checklists.CompletionRatePercent:0}%")</MudText>
                         </MudProgressCircular>

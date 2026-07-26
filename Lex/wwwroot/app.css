@@ -1310,7 +1310,7 @@ html {
     height: 10px;
 }
 
-.heatmap-level-0 { background-color: var(--mud-palette-action-disabled-background); }
+.heatmap-level-0 { background-color: rgba(var(--mud-palette-primary-rgb), 0.1);}
 .heatmap-level-1 { background-color: rgba(var(--mud-palette-primary-rgb), 0.3); }
 .heatmap-level-2 { background-color: rgba(var(--mud-palette-primary-rgb), 0.5); }
 .heatmap-level-3 { background-color: rgba(var(--mud-palette-primary-rgb), 0.75); }
