@@ -319,12 +319,9 @@
 
     private async Task OpenPreviewDialog(Guid checklistId)
     {
-        var checklist = await CatalogService.GetChecklistWithItemsAsync(checklistId);
-        if (checklist == null) return;
-
         var parameters = new DialogParameters
         {
-            ["Checklist"] = checklist
+            ["ChecklistId"] = checklistId
         };
         var options = new DialogOptions
         {

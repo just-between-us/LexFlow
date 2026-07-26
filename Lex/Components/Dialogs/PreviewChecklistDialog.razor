@@ -1,53 +1,152 @@
-﻿@using Lex.Domain.Entities
+﻿@using lex.Application.Interfaces
+@using Lex.Domain.Entities
+@inject IChecklistCatalogService CatalogService
+@inject NavigationManager NavigationManager
 
 <MudDialog>
     <TitleContent>
-        <MudText Typo="Typo.h6">@Checklist.Title</MudText>
-        <MudText Typo="Typo.caption" Class="mud-text-secondary">@Checklist.Description</MudText>
-    </TitleContent>
-    
-    <DialogContent>
-        @if (Checklist.Items?.Any() == true)
+        @if (_checklist is not null)
         {
-            <MudList T="string" Gutters="false">
-                @foreach (var item in Checklist.Items.OrderBy(i => i.Order))
+            <div>
+                <MudText Typo="Typo.h6">@_checklist.Title</MudText>
+                @if (!string.IsNullOrWhiteSpace(_checklist.Description))
                 {
-                    <MudListItem Gutters="false">
-                        <MudStack Row="true" Spacing="3" Class="align-start">
-                            <MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Color="Color.Primary" Size="Size.Small" Class="mt-1" />
-                            <div style="width: 100%;">
-                                <MudText Typo="Typo.body1" Class="font-weight-medium">@item.Title</MudText>
-                                @if (!string.IsNullOrWhiteSpace(item.Description))
-                                {
-                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@item.Description</MudText>
-                                }
-                                @if (!string.IsNullOrWhiteSpace(item.Content))
-                                {
-                                    <MudText Typo="Typo.body2" Class="mt-2" Style="background: var(--mud-palette-background-grey); padding: 12px; border-radius: 8px;">
-                                        @item.Content
-                                    </MudText>
-                                }
-                            </div>
-                        </MudStack>
-                    </MudListItem>
+                    <MudText Typo="Typo.body2" Class="text-muted mt-1">@_checklist.Description</MudText>
                 }
-            </MudList>
+                <div class="d-flex align-center gap-2 flex-wrap mt-2">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Filled.FormatListNumbered">
+                        @(_checklist.Items?.Count(i => !i.IsDeleted) ?? 0) пунктов
+                    </MudChip>
+                    @if (_checklist.Chips?.Any() == true)
+                    {
+                        @foreach (var chip in _checklist.Chips.Take(4))
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@chip.Chip</MudChip>
+                        }
+                        @if (_checklist.Chips.Count > 4)
+                        {
+                            <MudTooltip Text="@string.Join(", ", _checklist.Chips.Skip(4).Select(c => c.Chip))">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text">+@(_checklist.Chips.Count - 4)</MudChip>
+                            </MudTooltip>
+                        }
+                    }
+                </div>
+            </div>
         }
         else
         {
-            <MudText Typo="Typo.body2" Color="Color.Error" Class="pa-4">Пунктов нет</MudText>
+            <MudText Typo="Typo.h6">Пункты чек-листа</MudText>
+        }
+    </TitleContent>
+
+    <DialogContent>
+        @if (_isLoading)
+        {
+            <div class="pa-2">
+                @for (int i = 0; i < 4; i++)
+                {
+                    <div class="d-flex gap-3 mb-4">
+                        <MudSkeleton SkeletonType="SkeletonType.Circle" Width="28px" Height="28px" />
+                        <div class="flex-grow-1">
+                            <MudSkeleton Width="60%" Height="20px" Class="mb-1" />
+                            <MudSkeleton Width="90%" Height="16px" />
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else if (_checklist is null)
+        {
+            <div class="text-center pa-6">
+                <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Large" Class="mb-2 text-muted" />
+                <MudText Typo="Typo.body1">Не удалось загрузить чек-лист</MudText>
+                <MudText Typo="Typo.body2" Class="text-muted">Попробуйте открыть предпросмотр ещё раз</MudText>
+            </div>
+        }
+        else if (_checklist.Items?.Any(i => !i.IsDeleted) != true)
+        {
+            <div class="text-center pa-6">
+                <MudIcon Icon="@Icons.Material.Filled.PlaylistRemove" Size="Size.Large" Class="mb-2 text-muted" />
+                <MudText Typo="Typo.body1">В этом чек-листе пока нет пунктов</MudText>
+            </div>
+        }
+        else
+        {
+            <div class="checklist-preview-list">
+                @{ var index = 0; }
+                @foreach (var item in _checklist.Items.Where(i => !i.IsDeleted).OrderBy(i => i.Order))
+                {
+                    index++;
+                    var itemIndex = index;
+                    <div class="checklist-preview-item">
+                        <div class="checklist-preview-number">@itemIndex</div>
+                        <div class="flex-grow-1">
+                            <MudText Typo="Typo.body1" Class="font-weight-medium">@item.Title</MudText>
+                            @if (!string.IsNullOrWhiteSpace(item.Description))
+                            {
+                                <MudText Typo="Typo.body2" Class="text-muted mt-1">@item.Description</MudText>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(item.Content))
+                            {
+                                var isExpanded = _expandedItems.Contains(item.Id);
+                                <MudButton Size="Size.Small" Variant="Variant.Text"
+                                           StartIcon="@(isExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                                           OnClick="@(() => ToggleExpand(item.Id))"
+                                           Class="px-1 mt-1">
+                                    @(isExpanded ? "Скрыть детали" : "Показать детали")
+                                </MudButton>
+                                <MudCollapse Expanded="@isExpanded">
+                                    <MudText Typo="Typo.body2" Class="checklist-preview-content mt-1">
+                                        @item.Content
+                                    </MudText>
+                                </MudCollapse>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
         }
     </DialogContent>
-    
+
     <DialogActions>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseDialog">Закрыть</MudButton>
+        <MudButton Variant="Variant.Text" OnClick="CloseDialog">Закрыть</MudButton>
+        @if (_checklist is not null && !_isLoading)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.PlayArrow"
+                       OnClick="StartChecklist">
+                Начать чек-лист
+            </MudButton>
+        }
     </DialogActions>
 </MudDialog>
 
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
 
-    [Parameter] public Checklist Checklist { get; set; } = null!;
+    [Parameter] public Guid ChecklistId { get; set; }
+
+    private Checklist? _checklist;
+    private bool _isLoading = true;
+    private readonly HashSet<Guid> _expandedItems = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _checklist = await CatalogService.GetChecklistWithItemsAsync(ChecklistId);
+        _isLoading = false;
+    }
+
+    private void ToggleExpand(Guid itemId)
+    {
+        if (!_expandedItems.Add(itemId))
+            _expandedItems.Remove(itemId);
+    }
 
     private void CloseDialog() => MudDialog.Cancel();
+
+    private void StartChecklist()
+    {
+        MudDialog.Close();
+        NavigationManager.NavigateTo($"/checklists/start?templateId={ChecklistId}");
+    }
 }

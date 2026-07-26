@@ -1,0 +1,96 @@
+﻿@using Lex.Components.Utils
+@using Lex.Domain.Entities
+
+<MudCard Elevation="1" Class="@($"{CardClasses} h-100 d-flex flex-column")">
+    <MudCardContent Class="flex-grow-1">
+        <div class="d-flex justify-space-between align-start mb-2">
+            <MudTooltip Text="@Active.Checklist?.Title">
+                <MudText Typo="Typo.h6" Class="text-truncate mr-2">
+                    @Active.Checklist?.Title
+                </MudText>
+            </MudTooltip>
+            <MudTooltip Text="@(IsCompleted ? "Все пункты отмечены выполненными" : "Есть незавершённые пункты")">
+                <MudChip T="string" Size="Size.Small"
+                         Color="@(IsCompleted ? Color.Success : Color.Primary)"
+                         Variant="Variant.Text">
+                    @(IsCompleted ? "Завершён" : "В процессе")
+                </MudChip>
+            </MudTooltip>
+        </div>
+
+        <div class="d-flex align-center gap-2 mb-3">
+            <MudTooltip Text="@($"Выполнено {CompletedCount} из {Active.Items.Count} пунктов")">
+                <MudProgressLinear Value="@Progress"
+                                   Color="@(IsCompleted ? Color.Success : Color.Primary)"
+                                   Class="flex-grow-1" />
+            </MudTooltip>
+            <MudText Typo="Typo.body2" Class="flex-shrink-0">@Progress.ToString("F0")%</MudText>
+        </div>
+
+        <div class="d-flex flex-wrap gap-3 mb-2">
+            <MudTooltip Text="Количество пунктов в чек-листе">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.ListAlt" Size="Size.Small" Class="mr-1 text-muted" />
+                    <MudText Typo="Typo.body2" Class="text-muted">@Active.Items.Count пунктов</MudText>
+                </div>
+            </MudTooltip>
+            <MudTooltip Text="@($"Последнее изменение: {(Active.UpdatedAtUtc ?? Active.CreatedAtUtc):dd.MM.yyyy HH:mm}")">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1 text-muted" />
+                    <MudText Typo="Typo.body2" Class="text-muted">@GetRelativeTime()</MudText>
+                </div>
+            </MudTooltip>
+        </div>
+
+        @if (Active.ClientOrganization != null)
+        {
+            <MudTooltip Text="Этот чек-лист привязан к организации">
+                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Apartment">
+                    @Active.ClientOrganization.Name
+                </MudChip>
+            </MudTooltip>
+        }
+    </MudCardContent>
+
+    <MudCardActions Class="border-top pa-2 gap-1">
+        <MudTooltip Text="@(IsCompleted ? "Открыть завершённый чек-лист" : "Продолжить с того места, где остановились")">
+            <MudButton StartIcon="@(IsCompleted ? Icons.Material.Filled.Visibility : Icons.Material.Filled.PlayArrow)"
+                       Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       Size="Size.Small"
+                       OnClick="@(() => OnContinue.InvokeAsync(Active.Id))"
+                       FullWidth>
+                @(IsCompleted ? "Просмотр" : "Продолжить")
+            </MudButton>
+        </MudTooltip>
+        <MudTooltip Text="Удалить чек-лист безвозвратно">
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           Size="Size.Small"
+                           Color="Color.Error"
+                           OnClick="@(() => OnDelete.InvokeAsync(Active))" />
+        </MudTooltip>
+    </MudCardActions>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public ActiveChecklist Active { get; set; } = null!;
+    [Parameter] public EventCallback<Guid> OnContinue { get; set; }
+    [Parameter] public EventCallback<ActiveChecklist> OnDelete { get; set; }
+
+    private double Progress => Active.Items.Any()
+        ? Math.Round((double)CompletedCount / Active.Items.Count * 100, 0)
+        : 0;
+
+    private int CompletedCount => Active.Items.Count(i => i.IsCompleted);
+    private bool IsCompleted => Progress >= 100;
+
+    private string CardClasses => IsCompleted
+        ? "active-checklist-card active-checklist-card-success"
+        : "active-checklist-card active-checklist-card-progress";
+
+    private string GetRelativeTime()
+    {
+        var updatedAt = Active.UpdatedAtUtc ?? Active.CreatedAtUtc;
+        return DisplayHelper.GetRelativeTime(updatedAt);
+    }
+}

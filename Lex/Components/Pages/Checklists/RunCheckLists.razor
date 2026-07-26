@@ -1,10 +1,16 @@
 ﻿@page "/checklists/active/{ActiveChecklistId:guid}"
+@attribute [Authorize]
 @using lex.Application.DTOs
 @using lex.Application.Interfaces
+@using Lex.Components.Auth
+@using Microsoft.AspNetCore.Authorization
+@using BlazorKit.CopyToClipboard
 @inject IActiveChecklistService ActiveChecklistService
+@inject UserContext UserContext
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject IClipboardService ClipboardService
 
 <PageTitle>@(_details?.ChecklistTitle ?? "Прохождение чек-листа")</PageTitle>
 
@@ -13,6 +19,20 @@
     <div class="d-flex justify-center pa-8">
         <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
     </div>
+}
+else if (_accessDenied)
+{
+    <MudPaper Class="pa-8 rounded-lg text-center" Elevation="0" Style="background: var(--mud-palette-background-grey);">
+        <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" Class="mb-2 text-muted" />
+        <MudText Typo="Typo.h6" Class="mb-1">Нет доступа</MudText>
+        <MudText Typo="Typo.body2" Class="text-muted mb-3">
+            У вас нет прав на просмотр этого чек-листа — попросите владельца добавить вас как редактора
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="@(() => NavigationManager.NavigateTo("/checklists/my"))">
+            Мои чек-листы
+        </MudButton>
+    </MudPaper>
 }
 else if (_details is null)
 {
@@ -33,9 +53,9 @@ else
     <div class="py-4">
         <MudButton Variant="Variant.Text"
                    StartIcon="@Icons.Material.Filled.ArrowBack"
-                   OnClick="@(() => NavigationManager.NavigateTo("/checklists/templates"))"
+                   OnClick="@(() => NavigationManager.NavigateTo("/checklists/my"))"
                    Class="mb-2">
-            К каталогу
+            К моим чек-листам
         </MudButton>
 
         <div class="d-flex align-start justify-space-between flex-wrap gap-3 mb-2">
@@ -47,15 +67,137 @@ else
                         @_details.ChecklistDescription
                     </MudText>
                 }
+                <div class="d-flex align-center gap-2 flex-wrap mt-2">
+                    <MudTooltip Text="@(_details.CurrentUserIsOwner ? "Вы создали этот чек-лист" : $"Создатель: {_details.OwnerFullName}")">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Filled.Person">
+                            @(_details.CurrentUserIsOwner ? "Вы владелец" : _details.OwnerFullName)
+                        </MudChip>
+                    </MudTooltip>
+                    @if (!_details.CurrentUserIsOwner)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text" Icon="@Icons.Material.Filled.Edit">
+                            Вы редактор
+                        </MudChip>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_details.ClientOrganizationName))
+                    {
+                        <MudTooltip Text="Чек-лист привязан к организации">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Apartment">
+                                @_details.ClientOrganizationName
+                            </MudChip>
+                        </MudTooltip>
+                    }
+                </div>
             </div>
 
-            <MudMenu Icon="@Icons.Material.Filled.MoreVert" AnchorOrigin="Origin.BottomRight">
-                <MudMenuItem OnClick="@DeleteProgress" IconColor="Color.Error" Icon="@Icons.Material.Filled.DeleteOutline">
-                    Удалить прогресс
-                </MudMenuItem>
-            </MudMenu>
+            @if (_details.CurrentUserIsOwner)
+            {
+                <MudMenu Icon="@Icons.Material.Filled.MoreVert" AnchorOrigin="Origin.BottomRight">
+                    <MudMenuItem OnClick="@ToggleManagePanel" Icon="@Icons.Material.Filled.Group">
+                        @(_managePanelOpen ? "Скрыть управление" : "Управление доступом")
+                    </MudMenuItem>
+                    <MudMenuItem OnClick="@DeleteProgress" IconColor="Color.Error" Icon="@Icons.Material.Filled.DeleteOutline">
+                        Удалить прогресс
+                    </MudMenuItem>
+                </MudMenu>
+            }
         </div>
     </div>
+
+    @if (_details.CurrentUserIsOwner)
+    {
+        <MudCollapse Expanded="@_managePanelOpen">
+            <MudCard Elevation="1" Class="mb-4 section-card">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-1 d-flex align-center gap-1">
+                        <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Small" />
+                        Управление доступом
+                    </MudText>
+                    <MudText Typo="Typo.caption" Class="text-muted mb-3">
+                        Редакторы видят чек-лист и могут отмечать пункты и оставлять заметки
+                    </MudText>
+
+                    @if (_details.Editors.Any())
+                    {
+                        @foreach (var editor in _details.Editors)
+                        {
+                            <div class="d-flex align-center gap-3 py-2">
+                                <MudAvatar Color="Color.Secondary" Size="Size.Small">@GetInitials(editor.FullName)</MudAvatar>
+                                <div class="flex-grow-1">
+                                    <MudText Typo="Typo.body2">@editor.FullName</MudText>
+                                    <MudText Typo="Typo.caption" Class="text-muted">@editor.Email</MudText>
+                                </div>
+                                <MudTooltip Text="Убрать доступ">
+                                    <MudIconButton Icon="@Icons.Material.Filled.PersonRemove" Size="Size.Small" Color="Color.Error"
+                                                   OnClick="@(() => RemoveEditor(editor))" />
+                                </MudTooltip>
+                            </div>
+                        }
+                        <MudDivider Class="my-2" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Class="text-muted pa-2">Пока нет редакторов</MudText>
+                    }
+
+                    <div class="d-flex align-start gap-2 flex-wrap mt-2">
+                        <MudTextField @bind-Value="_newEditorEmail"
+                                      Label="Email или логин"
+                                      Placeholder="colleague@company.com"
+                                      Variant="Variant.Outlined"
+                                      Immediate="true"
+                                      OnKeyUp="@(async e => { if (e.Key == "Enter") await AddEditor(); })"
+                                      Error="@(_addEditorError is not null)"
+                                      ErrorText="@_addEditorError"
+                                      Class="flex-grow-1" Style="min-width: 220px;" />
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                                   Disabled="@(_isAddingEditor || string.IsNullOrWhiteSpace(_newEditorEmail))"
+                                   OnClick="AddEditor" Style="height: 56px;">
+                            Добавить
+                        </MudButton>
+                    </div>
+
+                    <MudDivider Class="my-3" />
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-1">Приглашение по ссылке</MudText>
+                    <MudText Typo="Typo.caption" Class="text-muted d-block mb-2">
+                        Заглушка — переход по ссылке пока не подключает пользователя автоматически, но скопировать её уже можно
+                    </MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Link"
+                               OnClick="CopyInviteLink">
+                        Скопировать ссылку-приглашение
+                    </MudButton>
+
+                    @if (_details.OwnerHasOrganization)
+                    {
+                        <MudDivider Class="my-3" />
+                        <MudText Typo="Typo.subtitle2" Class="mb-1">Организация</MudText>
+                        @if (_details.ClientOrganizationId is null)
+                        {
+                            <MudText Typo="Typo.caption" Class="text-muted d-block mb-2">
+                                Прикрепите чек-лист к организации, чтобы он был виден коллегам в её сводке
+                            </MudText>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Info"
+                                       StartIcon="@Icons.Material.Filled.Apartment"
+                                       OnClick="AttachOrganization">
+                                Прикрепить к организации
+                            </MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Error"
+                                       StartIcon="@Icons.Material.Filled.LinkOff"
+                                       OnClick="DetachOrganization">
+                                Отвязать от «@_details.ClientOrganizationName»
+                            </MudButton>
+                        }
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudCollapse>
+    }
 
     <MudPaper Class="pa-4 mb-4 rounded-lg toolbar-panel" Elevation="0">
         <div class="d-flex align-center gap-4 flex-wrap">
@@ -82,6 +224,13 @@ else
         </div>
     </MudPaper>
 
+    @if (!_details.CurrentUserCanEdit)
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-3" Dense="true">
+            Вы просматриваете этот чек-лист в режиме только для чтения
+        </MudAlert>
+    }
+
     <MudStack Spacing="2">
         @foreach (var item in _details.Items.OrderBy(i => i.Order))
         {
@@ -90,6 +239,7 @@ else
                     <MudCheckBox T="bool"
                                  Value="@item.IsCompleted"
                                  ValueChanged="@(v => OnToggle(item, v))"
+                                 Disabled="@(!_details.CurrentUserCanEdit)"
                                  Color="Color.Success"
                                  Class="mt-n1" />
 
@@ -115,6 +265,7 @@ else
                                           Variant="Variant.Outlined"
                                           Lines="2"
                                           Immediate="true"
+                                          Disabled="@(!_details.CurrentUserCanEdit)"
                                           DebounceInterval="600"
                                           OnDebounceIntervalElapsed="@(v => SaveNote(item, v))"
                                           Class="mt-1" />
@@ -131,7 +282,14 @@ else
 
     private ActiveChecklistDetailsDto? _details;
     private bool _isLoading = true;
+    private bool _accessDenied;
     private Guid? _expandedItemId;
+    private Guid? _currentUserId;
+    private bool _managePanelOpen;
+
+    private string _newEditorEmail = string.Empty;
+    private bool _isAddingEditor;
+    private string? _addEditorError;
 
     private int _completedCount => _details?.Items.Count(i => i.IsCompleted) ?? 0;
     private double _progressPercent => _details is { Items.Count: > 0 }
@@ -140,44 +298,165 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        _currentUserId = Guid.TryParse(UserContext.CurrentUser?.UserId, out var uid) ? uid : null;
         await LoadData();
     }
 
     private async Task LoadData()
     {
+        if (_currentUserId is null) { _isLoading = false; return; }
+
         _isLoading = true;
+        _accessDenied = false;
         StateHasChanged();
-        _details = await ActiveChecklistService.GetDetailsAsync(ActiveChecklistId);
-        _isLoading = false;
-        StateHasChanged();
+
+        try
+        {
+            _details = await ActiveChecklistService.GetDetailsAsync(ActiveChecklistId, _currentUserId.Value);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _accessDenied = true;
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
     }
 
     private void ToggleExpand(Guid itemId)
         => _expandedItemId = _expandedItemId == itemId ? null : itemId;
 
+    private void ToggleManagePanel() => _managePanelOpen = !_managePanelOpen;
+
     private async Task OnToggle(ActiveChecklistItemDto item, bool value)
     {
+        if (_currentUserId is null || _details?.CurrentUserCanEdit != true) return;
         item.IsCompleted = value;
-        await ActiveChecklistService.ToggleItemAsync(item.Id, value);
+        try
+        {
+            await ActiveChecklistService.ToggleItemAsync(item.Id, _currentUserId.Value, value);
+        }
+        catch (Exception ex)
+        {
+            item.IsCompleted = !value; // откатываем UI, если сервер отказал
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
         StateHasChanged();
     }
 
     private void OnNoteChanged(ActiveChecklistItemDto item, string value)
         => item.Note = value;
 
-    private async Task SaveNote(string value, ActiveChecklistItemDto item)
-        => await ActiveChecklistService.UpdateNoteAsync(item.Id, value);
-
-    private Task SaveNote(ActiveChecklistItemDto item, string value)
-        => ActiveChecklistService.UpdateNoteAsync(item.Id, value);
+    private async Task SaveNote(ActiveChecklistItemDto item, string value)
+    {
+        if (_currentUserId is null || _details?.CurrentUserCanEdit != true) return;
+        try
+        {
+            await ActiveChecklistService.UpdateNoteAsync(item.Id, _currentUserId.Value, value);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
 
     private string GetItemClass(ActiveChecklistItemDto item) =>
-        item.IsCompleted
-            ? "rounded-lg checklist-item-done"
-            : "rounded-lg checklist-item";
+        item.IsCompleted ? "rounded-lg checklist-item-done" : "rounded-lg checklist-item";
+
+    private async Task AddEditor()
+    {
+        if (_currentUserId is null || string.IsNullOrWhiteSpace(_newEditorEmail)) return;
+
+        _isAddingEditor = true;
+        _addEditorError = null;
+        StateHasChanged();
+
+        try
+        {
+            _details = await ActiveChecklistService.AddEditorAsync(ActiveChecklistId, _currentUserId.Value, _newEditorEmail.Trim());
+            _newEditorEmail = string.Empty;
+            Snackbar.Add("Редактор добавлен", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _addEditorError = ex.Message;
+        }
+        finally
+        {
+            _isAddingEditor = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RemoveEditor(ActiveChecklistEditorDto editor)
+    {
+        if (_currentUserId is null) return;
+
+        var confirmed = await DialogService.ShowMessageBox(
+            "Убрать редактора?",
+            $"«{editor.FullName}» больше не сможет видеть и редактировать этот чек-лист.",
+            yesText: "Убрать", cancelText: "Отмена");
+        if (confirmed != true) return;
+
+        try
+        {
+            _details = await ActiveChecklistService.RemoveEditorAsync(ActiveChecklistId, _currentUserId.Value, editor.UserId);
+            Snackbar.Add("Доступ отозван", Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task CopyInviteLink()
+    {
+        var url = $"{NavigationManager.BaseUri.TrimEnd('/')}/checklists/join/{ActiveChecklistId}";
+        try
+        {
+            await ClipboardService.CopyToClipboard(url);
+            Snackbar.Add("Ссылка скопирована", Severity.Success);
+        }
+        catch
+        {
+            Snackbar.Add("Не удалось скопировать ссылку", Severity.Error);
+        }
+    }
+
+    private async Task AttachOrganization()
+    {
+        if (_currentUserId is null) return;
+        try
+        {
+            _details = await ActiveChecklistService.AttachToOwnerOrganizationAsync(ActiveChecklistId, _currentUserId.Value);
+            Snackbar.Add("Чек-лист привязан к организации", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task DetachOrganization()
+    {
+        if (_currentUserId is null) return;
+        try
+        {
+            _details = await ActiveChecklistService.DetachFromOrganizationAsync(ActiveChecklistId, _currentUserId.Value);
+            Snackbar.Add("Чек-лист отвязан от организации", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
 
     private async Task DeleteProgress()
     {
+        if (_currentUserId is null) return;
+
         var confirmed = await DialogService.ShowMessageBox(
             "Удалить прогресс?",
             "Весь прогресс по этому чек-листу будет скрыт. Вы сможете восстановить его при повторном запуске.",
@@ -185,8 +464,22 @@ else
 
         if (confirmed != true) return;
 
-        await ActiveChecklistService.DeleteAsync(ActiveChecklistId);
-        Snackbar.Add("Прогресс удалён", Severity.Info);
-        NavigationManager.NavigateTo("/checklists/templates");
+        try
+        {
+            await ActiveChecklistService.DeleteAsync(ActiveChecklistId, _currentUserId.Value);
+            Snackbar.Add("Прогресс удалён", Severity.Info);
+            NavigationManager.NavigateTo("/checklists/templates");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private static string GetInitials(string fullName)
+    {
+        var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var initials = string.Concat(parts.Take(2).Select(p => char.ToUpper(p[0])));
+        return string.IsNullOrEmpty(initials) ? "?" : initials;
     }
 }
