@@ -15,4 +15,10 @@ public interface IDocumentEditingService
         Guid documentId, Guid userId, Guid versionId,
         DocumentFieldsUpdateModel fields, string content, string? changeSummary,
         CancellationToken ct = default);
+
+    // Новое:
+    Task<DocumentEditDto> AddEditorAsync(Guid documentId, Guid requestingUserId, string emailOrUsername, CancellationToken ct = default);
+    Task<DocumentEditDto> RemoveEditorAsync(Guid documentId, Guid requestingUserId, Guid editorUserId, CancellationToken ct = default);
+    Task<DocumentEditDto> AttachToOwnerOrganizationAsync(Guid documentId, Guid requestingUserId, CancellationToken ct = default);
+    Task<DocumentEditDto> DetachFromOrganizationAsync(Guid documentId, Guid requestingUserId, CancellationToken ct = default);
 }

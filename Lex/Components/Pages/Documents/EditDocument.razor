@@ -71,7 +71,7 @@
                 }
             </div>
 
-            <div class="d-flex gap-2">
+            <div class="d-flex align-center gap-2">
                 <MudTooltip Text="Вернуться к просмотру без сохранения">
                     <MudButton Variant="Variant.Text" Color="Color.Secondary"
                                StartIcon="@Icons.Material.Filled.Visibility"
@@ -84,6 +84,101 @@
                                    Color="Color.Inherit"
                                    OnClick="@ToggleVersionPanel" />
                 </MudTooltip>
+
+                @if (_document.CurrentUserIsOwner)
+                {
+                    <MudTooltip Text="Организация и доступ редакторов">
+                        <MudMenu Icon="@Icons.Material.Filled.Group" Color="Color.Inherit"
+                                 AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                            <div class="access-popover pa-3" @onclick:stopPropagation="true">
+                                <MudText Typo="Typo.subtitle2" Class="mb-1 d-flex align-center gap-1">
+                                    <MudIcon Icon="@Icons.Material.Filled.Apartment" Size="Size.Small" />
+                                    Организация
+                                </MudText>
+
+                                @if (!_document.OwnerHasOrganization)
+                                {
+                                    <MudText Typo="Typo.caption" Class="text-muted d-block mb-3">
+                                        У вас нет организации — создайте её в разделе «Организация», чтобы привязывать документы
+                                    </MudText>
+                                }
+                                else if (_document.ClientOrganizationId is null)
+                                {
+                                    <MudText Typo="Typo.caption" Class="text-muted d-block mb-2">
+                                        Документ не привязан — коллеги по организации его не увидят
+                                    </MudText>
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.Link" FullWidth
+                                               OnClick="AttachOrganization">
+                                        Прикрепить к организации
+                                    </MudButton>
+                                }
+                                else
+                                {
+                                    <div class="d-flex align-center justify-space-between mb-1 gap-2">
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Apartment">
+                                            @_document.ClientOrganizationName
+                                        </MudChip>
+                                        <MudTooltip Text="Отвязать от организации">
+                                            <MudIconButton Icon="@Icons.Material.Filled.LinkOff" Size="Size.Small" Color="Color.Error"
+                                                           OnClick="DetachOrganization" />
+                                        </MudTooltip>
+                                    </div>
+                                }
+
+                                <MudDivider Class="my-3" />
+
+                                <MudText Typo="Typo.subtitle2" Class="mb-1 d-flex align-center gap-1">
+                                    <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" />
+                                    Редакторы
+                                </MudText>
+                                <MudText Typo="Typo.caption" Class="text-muted d-block mb-2">
+                                    Могут редактировать документ наравне с вами
+                                </MudText>
+
+                                @if (_document.Editors.Any())
+                                {
+                                    <div class="editor-list mb-2">
+                                        @foreach (var editor in _document.Editors)
+                                        {
+                                            <div class="editor-row-wrapper">
+                                                <div class="editor-row">
+                                                    <MudAvatar Size="Size.Small" Color="Color.Secondary">@GetInitials(editor.FullName)</MudAvatar>
+                                                    <div class="flex-grow-1 min-width-0">
+                                                        <MudText Typo="Typo.body2" Class="text-truncate">@editor.FullName</MudText>
+                                                        <MudText Typo="Typo.caption" Class="text-muted text-truncate">@editor.Email</MudText>
+                                                    </div>
+                                                </div>
+                                                <MudTooltip Text="Убрать доступ">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error"
+                                                                   Class="editor-remove-button"
+                                                                   OnClick="@(() => RemoveEditor(editor))" />
+                                                </MudTooltip>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.body2" Class="text-muted pa-1 mb-2">Пока нет редакторов</MudText>
+                                }
+
+                                <div class="d-flex gap-1">
+                                    <MudTextField @bind-Value="_newEditorEmail" Placeholder="Email или логин"
+                                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                                  Immediate="true"
+                                                  OnKeyUp="@(async e => { if (e.Key == "Enter") await AddEditor(); })"
+                                                  Error="@(_addEditorError is not null)"
+                                                  ErrorText="@_addEditorError"
+                                                  Class="flex-grow-1" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" Variant="Variant.Filled"
+                                                   Disabled="@(_isAddingEditor || string.IsNullOrWhiteSpace(_newEditorEmail))"
+                                                   OnClick="AddEditor" />
+                                </div>
+                            </div>
+                        </MudMenu>
+                    </MudTooltip>
+                }
             </div>
         </div>
 
@@ -348,6 +443,9 @@
     private Guid? _currentUserId;
     private SaveState _saveState = SaveState.Idle;
     private enum SaveState { Idle, Saving, Success }
+    private string _newEditorEmail = string.Empty;
+    private bool _isAddingEditor;
+    private string? _addEditorError;
 
     private string _editTitle = "";
     private string _editDescription = "";
@@ -521,6 +619,85 @@
             _isSaving = false;
             StateHasChanged();
         }
+    }
+    
+    private async Task AddEditor()
+    {
+        if (_document is null || _currentUserId is null || string.IsNullOrWhiteSpace(_newEditorEmail)) return;
+        _isAddingEditor = true;
+        _addEditorError = null;
+        StateHasChanged();
+        try
+        {
+            _document = await DocumentEditingService.AddEditorAsync(_document.Id, _currentUserId.Value, _newEditorEmail.Trim());
+            _newEditorEmail = string.Empty;
+            Snackbar.Add("Редактор добавлен", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _addEditorError = ex.Message;
+        }
+        finally
+        {
+            _isAddingEditor = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RemoveEditor(DocumentEditorDto editor)
+    {
+        if (_document is null || _currentUserId is null) return;
+
+        var confirmed = await DialogService.ShowMessageBox(
+            "Убрать редактора?",
+            $"«{editor.FullName}» больше не сможет редактировать документ.",
+            yesText: "Убрать", cancelText: "Отмена");
+        if (confirmed != true) return;
+
+        try
+        {
+            _document = await DocumentEditingService.RemoveEditorAsync(_document.Id, _currentUserId.Value, editor.UserId);
+            Snackbar.Add("Доступ отозван", Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task AttachOrganization()
+    {
+        if (_document is null || _currentUserId is null) return;
+        try
+        {
+            _document = await DocumentEditingService.AttachToOwnerOrganizationAsync(_document.Id, _currentUserId.Value);
+            Snackbar.Add("Документ привязан к организации", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task DetachOrganization()
+    {
+        if (_document is null || _currentUserId is null) return;
+        try
+        {
+            _document = await DocumentEditingService.DetachFromOrganizationAsync(_document.Id, _currentUserId.Value);
+            Snackbar.Add("Документ отвязан от организации", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private static string GetInitials(string fullName)
+    {
+        var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var initials = string.Concat(parts.Take(2).Select(p => char.ToUpper(p[0])));
+        return string.IsNullOrEmpty(initials) ? "?" : initials;
     }
 
     private async void FinishSave(DocumentVersionSummaryDto updatedVersion)

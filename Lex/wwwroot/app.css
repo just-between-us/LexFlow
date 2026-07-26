@@ -1026,7 +1026,59 @@ html {
     right: 0;
     transition: opacity 0.2s ease 0s, right 0.2s ease 0s;
 }
+.access-popover {
+    width: 320px;
+    max-height: 440px;
+    overflow-y: auto;
+}
 
+.editor-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.editor-row-wrapper {
+    display: flex;
+    position: relative;
+    overflow: visible;
+}
+
+.editor-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s ease;
+}
+
+.editor-row-wrapper:hover .editor-row {
+    transform: translateX(-32px);
+    background-color: var(--mud-palette-action-default-hover);
+}
+
+.editor-remove-button {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease 0s, right 0.2s ease 0s;
+}
+
+.editor-row-wrapper:hover .editor-remove-button {
+    opacity: 1;
+    pointer-events: auto;
+    right: 4px;
+    transition: opacity 0.2s ease 0.15s, right 0.2s ease 0.15s;
+}
+
+.min-width-0 {
+    min-width: 0;
+}
 .checklist-item {
     border: 1px solid var(--mud-palette-lines-default);
     transition: background-color 0.2s ease, border-color 0.2s ease;

@@ -12,8 +12,21 @@ public class DocumentEditDto
     public DocumentPrivacy Privacy { get; set; }
     public int CurrentVersionNumber { get; set; }
     public Guid? TemplateId { get; set; }
+    public List<DocumentVersionSummaryDto> Versions { get; set; } = new();
 
-    public List<DocumentVersionSummaryDto> Versions { get; set; } = new(); // по убыванию VersionNumber
+    public Guid OwnerUserId { get; set; }
+    public bool CurrentUserIsOwner { get; set; }
+    public List<DocumentEditorDto> Editors { get; set; } = new();
+    public Guid? ClientOrganizationId { get; set; }
+    public string? ClientOrganizationName { get; set; }
+    public bool OwnerHasOrganization { get; set; }
+}
+
+public class DocumentEditorDto
+{
+    public Guid UserId { get; set; }
+    public string FullName { get; set; } = string.Empty;
+    public string? Email { get; set; }
 }
 
 public class DocumentVersionSummaryDto
