@@ -292,16 +292,18 @@
                     <MudStack Spacing="2">
                         @foreach (var d in documents)
                         {
-                            <MudPaper Class="pa-3 rounded-lg activity-row" Elevation="0">
-                                <div class="d-flex justify-space-between align-center">
-                                    <MudText Typo="Typo.body1">@d.Title</MudText>
-                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@d.Status</MudChip>
-                                </div>
-                                <MudText Typo="Typo.caption" Class="text-muted">
-                                    @d.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
-                                    @(showOwner && !string.IsNullOrWhiteSpace(d.OwnerName) ? $" · {d.OwnerName}" : "")
-                                </MudText>
-                            </MudPaper>
+                            <a href="@($"/documents/{d.Id}")">
+                                <MudPaper Class="pa-3 rounded-lg activity-row" Elevation="0">
+                                    <div class="d-flex justify-space-between align-center">
+                                        <MudText Typo="Typo.body1">@d.Title</MudText>
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@d.Status</MudChip>
+                                    </div>
+                                    <MudText Typo="Typo.caption" Class="text-muted">
+                                        @d.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                        @(showOwner && !string.IsNullOrWhiteSpace(d.OwnerName) ? $" · {d.OwnerName}" : "")
+                                    </MudText>
+                                </MudPaper>
+                            </a>
                         }
                     </MudStack>
                 }

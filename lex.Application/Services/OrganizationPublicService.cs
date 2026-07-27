@@ -1,5 +1,6 @@
 ﻿using lex.Application.DTOs;
 using lex.Application.Interfaces;
+using Lex.Domain.Enums;
 using Lex.Infrastructure.Repositories;
 
 namespace lex.Application.Services;
@@ -42,13 +43,27 @@ public class OrganizationPublicService : IOrganizationPublicService
         var org = await _orgRepo.GetOrganizationDetailsAsync(organizationId, ct);
         if (org == null) return null;
 
-        // Проверяем, является ли текущий пользователь участником
         bool isMember = org.Staff.Any(u => u.Id == currentUserId) || org.OwnerUserId == currentUserId;
+        bool canViewDetails = isMember || org.Privacy == OrganizationPrivacy.Public;
 
-        // Загружаем документы и активные чек-листы параллельно
+        if (!canViewDetails)
+        {
+            return new OrganizationDetailsDto
+            {
+                Id = org.Id,
+                Name = org.Name,
+                Privacy = org.Privacy,
+                IsActive = org.IsActive,
+                CreatedAtUtc = org.CreatedAtUtc,
+                IsCurrentUserMember = false,
+                CanViewDetails = false
+            };
+        }
+        
         var documentsTask = _orgRepo.GetPublicDocumentsByOrganizationAsync(organizationId, ct);
         var activeChecklistsTask = _orgRepo.GetActiveChecklistsByOrganizationAsync(organizationId, ct);
-        await Task.WhenAll(documentsTask, activeChecklistsTask);
+        var privateDocsCountTask = _orgRepo.GetPrivateDocumentsCountByOrganizationAsync(organizationId, ct);
+        await Task.WhenAll(documentsTask, activeChecklistsTask, privateDocsCountTask);
 
         var documents = (await documentsTask).Select(d => new OrganizationDocumentDto
         {
@@ -83,6 +98,8 @@ public class OrganizationPublicService : IOrganizationPublicService
             StaffCount = org.Staff.Count,
             IsCurrentUserMember = isMember,
             Documents = documents,
+            Privacy = org.Privacy,
+            PrivateDocumentsCount = await privateDocsCountTask,
             ActiveChecklists = checklists
         };
     }

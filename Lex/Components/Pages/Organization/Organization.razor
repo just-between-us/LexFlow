@@ -174,7 +174,7 @@
                                           MaxLength="200" Counter="200" Immediate="true" />
                         </MudItem>
                         <MudItem xs="12">
-                            <MudSelect @bind-Value="_editModel!.Privacy" Label="Приватность" T="OrganizationPrivacy"
+                            <MudSelect @bind-Value="_editModel.Privacy" Label="Приватность"  T="OrganizationPrivacy"  For="@(() => _editModel.Privacy)"
                                        Variant="Variant.Outlined"
                                        HelperText="Публичные организации видны в общем каталоге">
                                 @foreach (OrganizationPrivacy p in Enum.GetValues(typeof(OrganizationPrivacy)))
@@ -295,6 +295,7 @@
     private bool _isAddingStaff;
     private string? _addStaffError;
 
+    
     protected override async Task OnInitializedAsync()
     {
         _currentUserId = Guid.TryParse(UserContext.CurrentUser?.UserId, out var uid) ? uid : null;
@@ -335,6 +336,7 @@
             Name = _organization.Name,
             Description = _organization.Description,
             TaxId = _organization.TaxId,
+            Privacy = _organization.Privacy,
             RegistrationNumber = _organization.RegistrationNumber
         };
         TakeSnapshot();

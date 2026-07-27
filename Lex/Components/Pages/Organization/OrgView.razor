@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using lex.Application.DTOs
 @using lex.Application.Interfaces
+@using Lex.Domain.Enums
 @using Lex.Components.Auth
 @using Lex.Components.Utils
 @using Microsoft.AspNetCore.Authorization
@@ -13,11 +14,47 @@
 <MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
     @if (_isLoading)
     {
-        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-8" />
+        <MudSkeleton Width="40%" Height="24px" Class="mb-4" />
+        <MudSkeleton Width="100%" Height="180px" Class="rounded-lg mb-6" />
+        <MudSkeleton Width="20%" Height="28px" Class="mb-3" />
+        <MudGrid>
+            @for (int i = 0; i < 3; i++)
+            {
+                <MudItem xs="12" sm="6" lg="4"><MudSkeleton Width="100%" Height="140px" Class="rounded-lg" /></MudItem>
+            }
+        </MudGrid>
     }
     else if (_org == null)
     {
-        <MudAlert Severity="Severity.Error" Class="mb-4">Организация не найдена или недоступна.</MudAlert>
+        <MudPaper Class="pa-8 rounded-lg text-center" Elevation="0" Style="background: var(--mud-palette-background-grey);">
+            <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Large" Class="mb-2 text-muted" />
+            <MudText Typo="Typo.h6" Class="mb-1">Организация не найдена</MudText>
+            <MudText Typo="Typo.body2" Class="text-muted mb-3">Возможно, она была удалена</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="@(() => Navigation.NavigateTo("/companies/public"))">
+                К списку организаций
+            </MudButton>
+        </MudPaper>
+    }
+    else if (!_org.CanViewDetails)
+    {
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="@(() => Navigation.NavigateTo("/companies/public"))" Class="mb-4">
+            Назад к списку
+        </MudButton>
+
+        <MudPaper Class="pa-8 rounded-lg text-center" Elevation="0" Style="background: var(--mud-palette-background-grey);">
+            <MudAvatar Size="Size.Large" Color="Color.Default" Style="width:64px;height:64px;font-size:1.4rem;" Class="mx-auto mb-3">
+                @GetInitials(_org.Name)
+            </MudAvatar>
+            <MudText Typo="Typo.h5" Class="mb-2">@_org.Name</MudText>
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Filled.Lock" Class="mb-3">
+                Приватная организация @_org.Privacy
+            </MudChip>
+            <MudText Typo="Typo.body2" Class="text-muted" Style="max-width: 420px; margin: 0 auto;">
+                Владелец скрыл детали этой организации от посторонних. Документы, чек-листы и состав сотрудников видны только участникам.
+            </MudText>
+        </MudPaper>
     }
     else
     {
@@ -26,47 +63,99 @@
             Назад к списку
         </MudButton>
 
-        <MudPaper Class="pa-6 rounded-lg mb-4 profile-hero" Elevation="0">
-            <div class="d-flex align-center justify-space-between flex-wrap gap-2">
-                <MudText Typo="Typo.h4">@_org.Name</MudText>
-                <MudChip T="string" Color="@(_org.IsActive ? Color.Success : Color.Error)" Variant="Variant.Text">
-                    @(_org.IsActive ? "Активна" : "Неактивна")
-                </MudChip>
+        @if (!_org.IsCurrentUserMember)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true" Icon="@Icons.Material.Filled.VisibilityOff">
+                Вы просматриваете эту страницу как гость — видны только публичные документы и общая статистика по чек-листам
+            </MudAlert>
+        }
+
+        <!-- Hero -->
+        <MudPaper Class="pa-6 rounded-lg mb-6 profile-hero" Elevation="0">
+            <div class="d-flex align-start gap-4 flex-wrap">
+                <MudAvatar Size="Size.Large" Color="Color.Primary" Style="width:64px;height:64px;font-size:1.4rem;">
+                    @GetInitials(_org.Name)
+                </MudAvatar>
+
+                <div class="flex-grow-1">
+                    <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+                        <MudText Typo="Typo.h4">@_org.Name</MudText>
+                        <div class="d-flex gap-2">
+                            <MudTooltip Text="@(_org.Privacy == OrganizationPrivacy.Public ? "Организация видна всем в каталоге" : "Организация видна только сотрудникам")">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text"
+                                         Icon="@(_org.Privacy == OrganizationPrivacy.Public ? Icons.Material.Filled.Public : Icons.Material.Filled.Lock)">
+                                    @(_org.Privacy == OrganizationPrivacy.Public ? "Публичная" : "Приватная")
+                                </MudChip>
+                            </MudTooltip>
+                            <MudTooltip Text="@(_org.IsActive ? "Организация ведёт активную деятельность" : "Организация отмечена как неактивная")">
+                                <MudChip T="string" Size="Size.Small" Color="@(_org.IsActive ? Color.Success : Color.Error)" Variant="Variant.Text">
+                                    @(_org.IsActive ? "Активна" : "Неактивна")
+                                </MudChip>
+                            </MudTooltip>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_org.Description))
+                    {
+                        <MudText Typo="Typo.body2" Class="text-muted mt-2">@_org.Description</MudText>
+                    }
+
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                        <MudTooltip Text="Создатель и владелец организации">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Filled.Person">
+                                @_org.OwnerFullName
+                            </MudChip>
+                        </MudTooltip>
+                        <MudTooltip Text="Общее число сотрудников, включая владельца">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Filled.Group">
+                                @_org.StaffCount сотрудников
+                            </MudChip>
+                        </MudTooltip>
+                        <MudTooltip Text="@($"Дата регистрации: {_org.CreatedAtUtc.ToLocalTime():dd.MM.yyyy}")">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Filled.CalendarToday">
+                                На платформе @DisplayHelper.GetRelativeTime(_org.CreatedAtUtc)
+                            </MudChip>
+                        </MudTooltip>
+                        @if (!string.IsNullOrWhiteSpace(_org.TaxId))
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">ИНН: @_org.TaxId</MudChip>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_org.RegistrationNumber))
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">ОГРН: @_org.RegistrationNumber</MudChip>
+                        }
+                    </div>
+                </div>
             </div>
-            @if (!string.IsNullOrWhiteSpace(_org.Description))
-            {
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">@_org.Description</MudText>
-            }
-            <div class="d-flex flex-wrap gap-4 mt-3">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
-                    Владелец: @_org.OwnerFullName
-                </MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Small" Class="mr-1" />
-                    Сотрудников: @_org.StaffCount
-                </MudText>
-                @if (!string.IsNullOrWhiteSpace(_org.TaxId))
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">ИНН: @_org.TaxId</MudText>
-                }
-                @if (!string.IsNullOrWhiteSpace(_org.RegistrationNumber))
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">ОГРН: @_org.RegistrationNumber</MudText>
-                }
-            </div>
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-                <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="mr-1" />
-                Создана: @_org.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy")
-            </MudText>
         </MudPaper>
 
         <!-- Документы -->
-        <MudText Typo="Typo.h5" Class="mb-3 mt-6">Документы</MudText>
+        <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-3 mt-6">
+            <MudText Typo="Typo.h5">Документы</MudText>
+            @if (_org.PrivateDocumentsCount > 0)
+            {
+                <MudTooltip Text="Эти документы приватны и видны только сотрудникам организации">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Filled.Lock">
+                        + @_org.PrivateDocumentsCount приватных
+                    </MudChip>
+                </MudTooltip>
+            }
+        </div>
+
         @if (!_org.Documents.Any())
         {
-            <MudPaper Class="pa-4 text-center" Elevation="0">
-                <MudText Color="Color.Secondary">Нет публичных документов</MudText>
+            <MudPaper Class="pa-6 rounded-lg text-center" Elevation="0" Style="background: var(--mud-palette-background-grey);">
+                @if (_org.PrivateDocumentsCount > 0)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" Class="mb-2 text-muted" />
+                    <MudText Typo="Typo.body1">Все документы этой организации приватны</MudText>
+                    <MudText Typo="Typo.body2" Class="text-muted">Их @_org.PrivateDocumentsCount, но они видны только сотрудникам</MudText>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Large" Class="mb-2 text-muted" />
+                    <MudText Typo="Typo.body1" Class="text-muted">Пока нет публичных документов</MudText>
+                }
             </MudPaper>
         }
         else
@@ -75,19 +164,30 @@
                 @foreach (var doc in _org.Documents)
                 {
                     <MudItem xs="12" sm="6" lg="4">
-                        <MudCard Elevation="1" Class="org-doc-card h-100 d-flex flex-column">
+                        <MudCard Elevation="1" Class="org-content-card h-100 d-flex flex-column">
                             <MudCardContent Class="flex-grow-1">
-                                <MudText Typo="Typo.h6" Class="mb-1">@doc.Title</MudText>
-                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2 line-clamp-2">
-                                    @(doc.Description ?? "Без описания")
+                                <div class="d-flex align-start justify-space-between gap-2 mb-1">
+                                    <MudText Typo="Typo.h6" Class="text-truncate">@doc.Title</MudText>
+                                    <MudTooltip Text="@DisplayHelper.GetStatusDescription(doc.Status)">
+                                        <MudChip T="string" Size="Size.Small" Color="@DisplayHelper.GetStatusColor(doc.Status)" Variant="Variant.Text">
+                                            @DisplayHelper.GetStatusDisplayName(doc.Status)
+                                        </MudChip>
+                                    </MudTooltip>
+                                </div>
+                                <MudText Typo="Typo.body2" Class="text-muted mb-3 line-clamp-2">
+                                    @(string.IsNullOrWhiteSpace(doc.Description) ? "Без описания" : doc.Description)
                                 </MudText>
-                                <div class="d-flex flex-wrap gap-2">
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">
+                                <div class="d-flex flex-wrap align-center gap-2">
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@DisplayHelper.GetTypeColor(doc.Type)">
                                         @DisplayHelper.GetTypeDisplayName(doc.Type)
                                     </MudChip>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                        v.@doc.CurrentVersionNumber
-                                    </MudText>
+                                    <MudTooltip Text="Актуальная версия документа">
+                                        <MudText Typo="Typo.caption" Class="text-muted">v.@doc.CurrentVersionNumber</MudText>
+                                    </MudTooltip>
+                                    @if (doc.UpdatedAtUtc.HasValue)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="text-muted">· @DisplayHelper.GetRelativeTime(doc.UpdatedAtUtc.Value)</MudText>
+                                    }
                                 </div>
                             </MudCardContent>
                             <MudCardActions Class="border-top pa-2">
@@ -110,8 +210,9 @@
         <MudText Typo="Typo.h5" Class="mb-3 mt-6">Активные чек-листы</MudText>
         @if (!_org.ActiveChecklists.Any())
         {
-            <MudPaper Class="pa-4 text-center" Elevation="0">
-                <MudText Color="Color.Secondary">Нет активных чек-листов</MudText>
+            <MudPaper Class="pa-6 rounded-lg text-center" Elevation="0" Style="background: var(--mud-palette-background-grey);">
+                <MudIcon Icon="@Icons.Material.Filled.Checklist" Size="Size.Large" Class="mb-2 text-muted" />
+                <MudText Typo="Typo.body1" Class="text-muted">Нет активных чек-листов</MudText>
             </MudPaper>
         }
         else
@@ -119,40 +220,43 @@
             <MudGrid>
                 @foreach (var acl in _org.ActiveChecklists)
                 {
+                    var isCompleted = acl.Progress >= 100;
                     <MudItem xs="12" sm="6" lg="4">
-                        <MudCard Elevation="1" Class="org-acl-card h-100 d-flex flex-column">
+                        <MudCard Elevation="1" Class="@(GetChecklistCardClass(isCompleted) + "h-100 d-flex flex-column")">
                             <MudCardContent Class="flex-grow-1">
-                                <MudText Typo="Typo.h6" Class="mb-1">@acl.Title</MudText>
+                                <MudText Typo="Typo.h6" Class="mb-2 text-truncate">@acl.Title</MudText>
                                 <div class="d-flex align-center gap-2 mb-2">
-                                    <MudProgressLinear Value="@acl.Progress" Color="@(acl.Progress == 100 ? Color.Success : Color.Primary)" Class="flex-grow-1" />
+                                    <MudProgressLinear Value="@acl.Progress" Color="@(isCompleted ? Color.Success : Color.Primary)" Class="flex-grow-1" />
                                     <MudText Typo="Typo.body2">@acl.Progress.ToString("F0")%</MudText>
                                 </div>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                <MudText Typo="Typo.caption" Class="text-muted">
                                     @acl.CompletedItems из @acl.TotalItems пунктов выполнено
                                 </MudText>
                             </MudCardContent>
                             <MudCardActions Class="border-top pa-2">
                                 @if (_org.IsCurrentUserMember)
                                 {
-                                    <MudButton StartIcon="@Icons.Material.Filled.PlayArrow"
+                                    <MudButton StartIcon="@(isCompleted ? Icons.Material.Filled.Visibility : Icons.Material.Filled.PlayArrow)"
                                                Color="Color.Primary"
                                                Variant="Variant.Filled"
                                                Size="Size.Small"
-                                               OnClick="@(() => Navigation.NavigateTo($"/checklists/start/{acl.ActiveChecklistId}"))"
+                                               OnClick="@(() => Navigation.NavigateTo($"/checklists/active/{acl.ActiveChecklistId}"))"
                                                FullWidth>
-                                        Продолжить
+                                        @(isCompleted ? "Просмотр" : "Продолжить")
                                     </MudButton>
                                 }
                                 else
                                 {
-                                    <MudButton StartIcon="@Icons.Material.Filled.Block"
-                                               Color="Color.Default"
-                                               Variant="Variant.Text"
-                                               Size="Size.Small"
-                                               Disabled="true"
-                                               FullWidth>
-                                        Нет доступа
-                                    </MudButton>
+                                    <MudTooltip Text="Доступно только сотрудникам организации">
+                                        <MudButton StartIcon="@Icons.Material.Filled.Lock"
+                                                   Color="Color.Default"
+                                                   Variant="Variant.Text"
+                                                   Size="Size.Small"
+                                                   Disabled="true"
+                                                   FullWidth>
+                                            Нет доступа
+                                        </MudButton>
+                                    </MudTooltip>
                                 }
                             </MudCardActions>
                         </MudCard>
@@ -191,5 +295,16 @@
         {
             _isLoading = false;
         }
+        StateHasChanged();
     }
+
+    private static string GetInitials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var initials = string.Concat(parts.Take(2).Select(p => char.ToUpper(p[0])));
+        return string.IsNullOrEmpty(initials) ? "?" : initials;
+    }
+
+    private static string GetChecklistCardClass(bool isCompleted) =>
+        isCompleted ? "org-content-card org-content-card-success" : "org-content-card org-content-card-progress";
 }

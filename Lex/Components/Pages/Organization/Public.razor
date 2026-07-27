@@ -120,16 +120,16 @@
                                 @(org.Description ?? "Без описания")
                             </MudText>
                             <div class="d-flex flex-wrap gap-2">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
+                                <MudText class="d-flex align-center" Typo="Typo.caption" Color="Color.Secondary">
+                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1"/>
                                     @org.OwnerFullName
-                                </MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Small" Class="mr-1" />
+                                    </MudText>
+                                <MudText class="d-flex align-center" Typo="Typo.caption" Color="Color.Secondary">
+                                    <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Small" Class="mr-1"/>
                                     @org.StaffCount
                                 </MudText>
                             </div>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-flex align-center text-center">
                                 <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="mr-1" />
                                 @org.CreatedAtUtc.ToString("dd.MM.yyyy")
                             </MudText>

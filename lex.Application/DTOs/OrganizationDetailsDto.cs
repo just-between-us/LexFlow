@@ -6,6 +6,7 @@ public class OrganizationDetailsDto
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    public OrganizationPrivacy Privacy { get; set; } = OrganizationPrivacy.Public;
     public string? Description { get; set; }
     public string? TaxId { get; set; }
     public string? RegistrationNumber { get; set; }
@@ -14,7 +15,9 @@ public class OrganizationDetailsDto
     public string OwnerFullName { get; set; } = string.Empty;
     public int StaffCount { get; set; }
     public bool IsCurrentUserMember { get; set; }
+    public bool CanViewDetails { get; set; } =  true;
     public List<OrganizationDocumentDto> Documents { get; set; } = new();
+    public int PrivateDocumentsCount { get; set; }
     public List<OrganizationActiveChecklistDto> ActiveChecklists { get; set; } = new();
 }
 

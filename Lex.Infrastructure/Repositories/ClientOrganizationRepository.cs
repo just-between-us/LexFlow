@@ -17,6 +17,14 @@ public class ClientOrganizationRepository : Repository<ClientOrganization>
             .Where(o => !o.IsDeleted && (o.OwnerUserId == userId || o.Staff.Any(u => u.Id == userId)))
             .FirstOrDefaultAsync(ct);
     }
+    public async Task<int> GetPrivateDocumentsCountByOrganizationAsync(Guid organizationId, CancellationToken ct = default)
+    {
+        return await _context.Documents
+            .Where(d => !d.IsDeleted
+                        && d.ClientOrganizationId == organizationId
+                        && d.Privacy == DocumentPrivacy.Private)
+            .CountAsync(ct);
+    }
 
     public async Task<ClientOrganization?> GetByIdWithStaffAsync(Guid organizationId, CancellationToken ct = default)
     {
