@@ -251,16 +251,15 @@
     private List<DocumentSummaryDto> _documents = new();
     private bool _isLoading = true;
     private bool _isRefreshing;
+    private int MinSpinMs = 600;
     private int _currentPage = 1;
     private int _totalPages = 1;
     private int _totalCount;
     private readonly int _pageSize = 12;
     private DocumentLifecycleFilter _lifecycleFilter = DocumentLifecycleFilter.NotDeleted;
-
-    private string _searchQuery = string.Empty;
     private DocumentStatus? _filterStatus;
     private DocumentPrivacy? _filterPrivacy;
-
+    private string _searchQuery = string.Empty;
     private string _sortField = "Date";
     private bool _sortAscending;
     private static readonly (string Field, string Label)[] SortOptions =
@@ -273,8 +272,25 @@
 
     private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_searchQuery) || _filterStatus.HasValue || _filterPrivacy.HasValue;
 
-    private const int MinSpinMs = 600;
+    
+    private async Task OnRefreshClick()
+    {
+        if (_isRefreshing) return;
 
+        _isRefreshing = true;
+        StateHasChanged();
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        await LoadData();
+
+        var remaining = MinSpinMs - (int)sw.ElapsedMilliseconds;
+        if (remaining > 0)
+            await Task.Delay(remaining);
+
+        _isRefreshing = false;
+        StateHasChanged();
+    }
+    
     private string ArrowRotationStyle =>
         $"transform: rotate({(_sortAscending ? 0 : 180)}deg); " +
         "transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);";
@@ -381,25 +397,7 @@
         _currentPage = page;
         await LoadData();
     }
-
-    private async Task OnRefreshClick()
-    {
-        if (_isRefreshing) return;
-
-        _isRefreshing = true;
-        StateHasChanged();
-
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        await LoadData();
-
-        var remaining = MinSpinMs - (int)sw.ElapsedMilliseconds;
-        if (remaining > 0)
-            await Task.Delay(remaining);
-
-        _isRefreshing = false;
-        StateHasChanged();
-    }
-
+    
     private async Task SetSort(string field)
     {
         if (_sortField == field)
