@@ -1013,6 +1013,9 @@ html {
     right: 8px;
     transition: opacity 0.2s ease 0.15s, right 0.2s ease 0.15s;
 }
+.lex-documents-card-wrapper--archived{
+    opacity: 0.5;
+}
 
 /* Отключение эффектов для архивных документов */
 .lex-documents-card-wrapper--archived:hover .lex-documents-card {
@@ -1026,6 +1029,17 @@ html {
     right: 0;
     transition: opacity 0.2s ease 0s, right 0.2s ease 0s;
 }
+
+.lex-documents-card-wrapper--deleted .lex-documents-card {
+    opacity: 0.6;
+    border: 1px dashed var(--mud-palette-error);
+}
+.lex-documents-card-wrapper--deleted:hover .lex-documents-card {
+    transform: none;
+    box-shadow: none;
+    opacity: 0.75;
+}
+
 .access-popover {
     width: 320px;
     max-height: 440px;

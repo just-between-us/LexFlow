@@ -1,0 +1,160 @@
+﻿@using lex.Application.DTOs
+@using Lex.Domain.Enums
+@using Lex.Components.Utils
+
+<MudItem xs="12" sm="6" lg="4" Class="lex-documents-item">
+    <div class="lex-documents-card-wrapper @GetWrapperClass()">
+        <MudCard Elevation="1" Class="lex-documents-card h-100 d-flex flex-column">
+            <MudCardContent Class="flex-grow-1">
+                <div class="d-flex align-start justify-space-between mb-2 gap-2">
+                    <div class="d-flex align-center gap-2 min-w-0 flex-grow-1">
+                        <MudIcon Icon="@DisplayHelper.GetTypeIcon(Document.Type)" Color="@DisplayHelper.GetTypeColor(Document.Type)" Class="flex-shrink-0" />
+                        <MudTooltip Text="@Document.Title" Arrow="true" Placement="Placement.Top">
+                            <MudText Typo="Typo.h6" Class="card-title mud-text-truncate">
+                                @Document.Title
+                            </MudText>
+                        </MudTooltip>
+                    </div>
+
+                    @if (!Document.IsDeleted)
+                    {
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small">
+                            <MudMenuItem OnClick="@(() => OnOpen.InvokeAsync(Document.Id))" Icon="@Icons.Material.Filled.Visibility">
+                                Открыть
+                            </MudMenuItem>
+                            <MudMenuItem OnClick="@(() => OnEdit.InvokeAsync(Document.Id))" Icon="@Icons.Material.Filled.Edit">
+                                Редактировать
+                            </MudMenuItem>
+                            <MudMenuItem OnClick="@(() => OnToggleArchive.InvokeAsync(Document))"
+                                         Icon="@(Document.ArchivedAtUtc.HasValue ? Icons.Material.Filled.Unarchive : Icons.Material.Filled.Archive)">
+                                @(Document.ArchivedAtUtc.HasValue ? "Разархивировать" : "Архивировать")
+                            </MudMenuItem>
+                            <MudMenuItem OnClick="@(() => OnDelete.InvokeAsync(Document))"
+                                         Icon="@Icons.Material.Filled.Delete"
+                                         IconColor="Color.Error">
+                                Удалить
+                            </MudMenuItem>
+                        </MudMenu>
+                    }
+                </div>
+
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                    @if (Document.IsDeleted)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text" Icon="@Icons.Material.Filled.DeleteOutline">
+                            Удалён
+                        </MudChip>
+                    }
+                    <MudChip T="string" Size="Size.Small" Color="@DisplayHelper.GetStatusColor(Document.Status)" Variant="Variant.Text">
+                        @DisplayHelper.GetStatusDisplayName(Document.Status)
+                    </MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="@DisplayHelper.GetTypeColor(Document.Type)" Variant="Variant.Outlined">
+                        @DisplayHelper.GetTypeDisplayName(Document.Type)
+                    </MudChip>
+                    @if (Document.Privacy != DocumentPrivacy.Private)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">
+                            @DisplayHelper.GetPrivacyDisplayName(Document.Privacy)
+                        </MudChip>
+                    }
+                </div>
+
+                <MudText Typo="Typo.body2" Class="text-muted mb-2 line-clamp-2">
+                    @(string.IsNullOrWhiteSpace(Document.Description) ? "Без описания" : Document.Description)
+                </MudText>
+
+                <div class="d-flex align-center gap-3 mt-4">
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.History" Color="Color.Secondary" Size="Size.Small" Class="mr-1"/>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            v.@Document.CurrentVersionNumber
+                        </MudText>
+                    </div>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@(Document.IsDeleted ? Icons.Material.Filled.DeleteOutline : Icons.Material.Filled.CalendarToday)" Color="Color.Secondary" Size="Size.Small" Class="mr-1"/>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @if (Document.IsDeleted && Document.DeletedAtUtc.HasValue)
+                            {
+                                @Document.DeletedAtUtc.Value.ToString("dd.MM.yyyy")
+                            }
+                            else
+                            {
+                                @((Document.UpdatedAtUtc ?? Document.CreatedAtUtc).ToString("dd.MM.yyyy"))
+                            }
+                        </MudText>
+                    </div>
+                </div>
+            </MudCardContent>
+
+            <MudCardActions Class="border-top pa-2 gap-1">
+                @if (Document.IsDeleted)
+                {
+                    <MudTooltip Text="Вернуть документ из удалённых">
+                        <MudButton StartIcon="@Icons.Material.Filled.RestoreFromTrash"
+                                   Color="Color.Success"
+                                   Variant="Variant.Filled"
+                                   Size="Size.Small"
+                                   OnClick="@(() => OnRestore.InvokeAsync(Document))"
+                                   FullWidth>
+                            Восстановить
+                        </MudButton>
+                    </MudTooltip>
+                }
+                else
+                {
+                    <MudTooltip Text="Открыть документ">
+                        <MudButton StartIcon="@Icons.Material.Filled.Visibility"
+                                   Color="Color.Default"
+                                   Variant="Variant.Text"
+                                   Size="Size.Small"
+                                   OnClick="@(() => OnOpen.InvokeAsync(Document.Id))"
+                                   FullWidth>
+                            Просмотр
+                        </MudButton>
+                    </MudTooltip>
+                    <MudTooltip Text="Редактировать">
+                        <MudButton StartIcon="@Icons.Material.Filled.Edit"
+                                   Color="Color.Primary"
+                                   Variant="Variant.Filled"
+                                   Size="Size.Small"
+                                   OnClick="@(() => OnEdit.InvokeAsync(Document.Id))"
+                                   FullWidth>
+                            Изменить
+                        </MudButton>
+                    </MudTooltip>
+                }
+            </MudCardActions>
+        </MudCard>
+
+        @if (!Document.IsDeleted)
+        {
+            <!-- Кнопка архивирования, выезжающая справа -->
+            <div>
+                <MudTooltip Text="@(Document.ArchivedAtUtc.HasValue ? "Разархивировать документ" : "Архивировать документ")">
+                    <MudIconButton Icon="@(Document.ArchivedAtUtc.HasValue ? Icons.Material.Filled.Unarchive : Icons.Material.Filled.Archive)"
+                                   Color="Color.Warning"
+                                   Variant="Variant.Filled"
+                                   Size="Size.Small"
+                                   Class="lex-documents-archive-button"
+                                   OnClick="@(() => OnToggleArchive.InvokeAsync(Document))"/>
+                </MudTooltip>
+            </div>
+        }
+    </div>
+</MudItem>
+
+@code {
+    [Parameter, EditorRequired] public DocumentSummaryDto Document { get; set; } = null!;
+    [Parameter] public EventCallback<Guid> OnOpen { get; set; }
+    [Parameter] public EventCallback<Guid> OnEdit { get; set; }
+    [Parameter] public EventCallback<DocumentSummaryDto> OnToggleArchive { get; set; }
+    [Parameter] public EventCallback<DocumentSummaryDto> OnDelete { get; set; }
+    [Parameter] public EventCallback<DocumentSummaryDto> OnRestore { get; set; }
+
+    private string GetWrapperClass()
+    {
+        if (Document.IsDeleted) return "lex-documents-card-wrapper--deleted";
+        if (Document.ArchivedAtUtc.HasValue) return "lex-documents-card-wrapper--archived";
+        return string.Empty;
+    }
+}
