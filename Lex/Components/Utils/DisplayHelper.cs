@@ -96,4 +96,17 @@ public static class DisplayHelper
             _ => utc.ToLocalTime().ToString("dd.MM.yyyy")
         };
     }
+    public static Color GetColorFromEmail(string email)
+    {
+        var hash = Math.Abs(email.GetHashCode()) % 5;
+        return hash switch
+        {
+            0 => Color.Primary,
+            1 => Color.Secondary,
+            2 => Color.Info,
+            3 => Color.Success,
+            _ => Color.Tertiary
+        };
+    }
+    
 }

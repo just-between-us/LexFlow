@@ -225,21 +225,8 @@
     private Color _avatarColor => _model?.Email switch
     {
         null => Color.Primary,
-        _ => GetColorFromEmail(_model.Email)
+        _ => DisplayHelper.GetColorFromEmail(_model.Email)
     };
-
-    private static Color GetColorFromEmail(string email)
-    {
-        var hash = Math.Abs(email.GetHashCode()) % 5;
-        return hash switch
-        {
-            0 => Color.Primary,
-            1 => Color.Secondary,
-            2 => Color.Info,
-            3 => Color.Success,
-            _ => Color.Tertiary
-        };
-    }
     
     private void OnBirthDateChanged(DateTime? value)
     {
@@ -313,7 +300,7 @@
     private void HandleFieldChanged(object? sender, FieldChangedEventArgs args)
     {
         RecalculateDirty();
-        StateHasChanged(); // событие приходит вне обычного рендер-цикла компонента, нужен явный вызов
+        StateHasChanged(); // событие приходит вне обычного рендер-цикла компонента, по этому нужен явный вызов
     }
     
     private void RecalculateDirty()
