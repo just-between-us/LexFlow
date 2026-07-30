@@ -7,6 +7,7 @@
 @using Lex.Components.Shared
 @using Lex.Components.Utils
 @using Microsoft.AspNetCore.Authorization
+@implements IDisposable
 @inject IDocumentService DocumentService
 @inject UserContext UserContext
 @inject ISnackbar Snackbar
@@ -262,6 +263,7 @@
     private string _searchQuery = string.Empty;
     private string _sortField = "Date";
     private bool _sortAscending;
+    private CancellationTokenSource? _loadCts;
     private static readonly (string Field, string Label)[] SortOptions =
     [
         ("Date", "По дате"),
@@ -311,6 +313,10 @@
 
     private async Task LoadData()
     {
+        _loadCts?.Cancel();
+        _loadCts = new CancellationTokenSource();
+        var ct = _loadCts.Token;
+
         _isLoading = true;
         StateHasChanged();
 
@@ -325,11 +331,18 @@
                 sortField: _sortField,
                 sortAscending: _sortAscending,
                 pageNumber: _currentPage,
-                pageSize: _pageSize);
+                pageSize: _pageSize,
+                cancellationToken: ct);
+
+            if (ct.IsCancellationRequested) return;
 
             _documents = items.ToList();
             _totalCount = total;
             _totalPages = Math.Max(1, (int)Math.Ceiling((double)total / _pageSize));
+        }
+        catch (OperationCanceledException)
+        {
+            // штатная отмена устаревшего запроса
         }
         catch (Exception ex)
         {
@@ -337,9 +350,12 @@
         }
         finally
         {
-            _isLoading = false;
-            _isRefreshing = false;
-            StateHasChanged();
+            if (!ct.IsCancellationRequested)
+            {
+                _isLoading = false;
+                _isRefreshing = false;
+                StateHasChanged();
+            }
         }
     }
 
@@ -478,4 +494,6 @@
         DocumentLifecycleFilter.ActiveOnly => "Нет активных документов",
         _ => "Документы не найдены"
     };
+    
+    public void Dispose() => _loadCts?.Cancel();
 }

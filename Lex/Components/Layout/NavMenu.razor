@@ -5,12 +5,12 @@
 <MudNavMenu Class="nav-menu">
     <div class="nav-scrollable">
         <!-- Главная -->
-        <MudNavLink Href="/dashboard" Match="NavLinkMatch.All" Class="nav-link" Icon="@Icons.Material.Filled.Dashboard">
-            Дашборд
-        </MudNavLink>
         
         @if (UserContext.IsAuthenticated)
         {
+            <MudNavLink Href="/dashboard" Match="NavLinkMatch.All" Class="nav-link" Icon="@Icons.Material.Filled.Dashboard">
+                Дашборд
+            </MudNavLink>
             <!-- Раздел Документы -->
             <MudText Typo="Typo.caption" Class="nav-section-title px-4 pt-4 pb-2">ДОКУМЕНТЫ</MudText>
             
