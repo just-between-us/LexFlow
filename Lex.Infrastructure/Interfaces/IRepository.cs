@@ -1,7 +1,7 @@
 ﻿using System.Linq.Expressions;
 using Lex.Domain.Entities;
 
-namespace lex.Application.Interfaces;
+namespace Lex.Infrastructure.Interfaces;
 
 public interface IRepository<T> where T : BaseEntity
 {

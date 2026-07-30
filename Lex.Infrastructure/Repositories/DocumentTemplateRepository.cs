@@ -2,24 +2,27 @@
 using Microsoft.EntityFrameworkCore;
 using Lex.Domain.Enums;
 using Lex.Infrastructure.Data;
-
 namespace Lex.Infrastructure.Repositories;
 
 public class DocumentTemplateRepository : Repository<DocumentTemplate>
 {
-    public DocumentTemplateRepository(AppDbContext context) : base(context)
+    public DocumentTemplateRepository(IDbContextFactory<AppDbContext> contextFactory) : base(contextFactory)
     {
     }
+
     public virtual async Task<double> GetAverageUsageCountAsync(
         CancellationToken cancellationToken = default)
     {
-        var counts = await _dbSet
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var counts = await context.DocumentTemplates
             .Where(t => !t.IsDeleted)
-            .Select(t => _context.Documents.Count(d => !d.IsDeleted && d.TemplateId == t.Id))
+            .Select(t => context.Documents.Count(d => !d.IsDeleted && d.TemplateId == t.Id))
             .ToListAsync(cancellationToken);
 
         return counts.Count == 0 ? 0 : counts.Average();
     }
+
     public virtual async Task<Dictionary<Guid, int>> GetUsageCountsAsync(
         IEnumerable<Guid> templateIds,
         CancellationToken cancellationToken = default)
@@ -28,7 +31,9 @@ public class DocumentTemplateRepository : Repository<DocumentTemplate>
         if (!ids.Any())
             return new Dictionary<Guid, int>();
 
-        return await _context.Documents
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.Documents
             .Where(d => !d.IsDeleted && d.TemplateId.HasValue && ids.Contains(d.TemplateId.Value))
             .GroupBy(d => d.TemplateId!.Value)
             .Select(g => new { TemplateId = g.Key, Count = g.Count() })
@@ -44,7 +49,8 @@ public class DocumentTemplateRepository : Repository<DocumentTemplate>
         bool sortAscending = true,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.Where(t => !t.IsDeleted);
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        var query = context.DocumentTemplates.Where(t => !t.IsDeleted);
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -59,16 +65,15 @@ public class DocumentTemplateRepository : Repository<DocumentTemplate>
 
         var totalCount = await query.CountAsync(cancellationToken);
 
-        // Применяем сортировку
         IOrderedQueryable<DocumentTemplate> orderedQuery = sortField switch
         {
             "Title" => sortAscending ? query.OrderBy(t => t.Title) : query.OrderByDescending(t => t.Title),
             "Type" => sortAscending ? query.OrderBy(t => t.Type) : query.OrderByDescending(t => t.Type),
-            "UsageCount" => sortAscending 
-                ? query.OrderBy(t => _context.Documents.Count(d => !d.IsDeleted && d.TemplateId == t.Id))
-                : query.OrderByDescending(t => _context.Documents.Count(d => !d.IsDeleted && d.TemplateId == t.Id)),
+            "UsageCount" => sortAscending
+                ? query.OrderBy(t => context.Documents.Count(d => !d.IsDeleted && d.TemplateId == t.Id))
+                : query.OrderByDescending(t => context.Documents.Count(d => !d.IsDeleted && d.TemplateId == t.Id)),
             "CreatedAtUtc" => sortAscending ? query.OrderBy(t => t.CreatedAtUtc) : query.OrderByDescending(t => t.CreatedAtUtc),
-            _ => query.OrderBy(t => t.Title) // сортировка по умолчанию
+            _ => query.OrderBy(t => t.Title)
         };
 
         var items = await orderedQuery
@@ -77,31 +82,31 @@ public class DocumentTemplateRepository : Repository<DocumentTemplate>
             .Select(t => new
             {
                 Template = t,
-                UsageCount = _context.Documents.Count(d => !d.IsDeleted && d.TemplateId == t.Id)
+                UsageCount = context.Documents.Count(d => !d.IsDeleted && d.TemplateId == t.Id)
             })
             .ToListAsync(cancellationToken);
 
-        var templates = items.Select(x => x.Template).ToList();
-        return (templates, totalCount);
+        return (items.Select(x => x.Template).ToList(), totalCount);
     }
-    
-    /// Получить шаблон со всеми подсказками
+
     public virtual async Task<DocumentTemplate?> GetTemplateWithHintsAsync(
-        Guid templateId, 
+        Guid templateId,
         CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.DocumentTemplates
             .Where(t => !t.IsDeleted && t.Id == templateId)
             .Include(t => t.Hints.Where(h => !h.IsDeleted).OrderBy(h => h.Order))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-
-    /// Получить все типы шаблонов с количеством
     public virtual async Task<Dictionary<DocumentType, int>> GetTemplateTypesStatsAsync(
         CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.DocumentTemplates
             .Where(t => !t.IsDeleted)
             .GroupBy(t => t.Type)
             .Select(g => new { Type = g.Key, Count = g.Count() })

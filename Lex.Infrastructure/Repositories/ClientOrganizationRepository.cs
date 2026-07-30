@@ -2,24 +2,26 @@
 using Lex.Domain.Enums;
 using Lex.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-
 namespace Lex.Infrastructure.Repositories;
 
 public class ClientOrganizationRepository : Repository<ClientOrganization>
 {
-    public ClientOrganizationRepository(AppDbContext context) : base(context) { }
+    public ClientOrganizationRepository(IDbContextFactory<AppDbContext> contextFactory) : base(contextFactory) { }
 
     public async Task<ClientOrganization?> GetForUserAsync(Guid userId, CancellationToken ct = default)
     {
-        return await _dbSet
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+        return await context.ClientOrganizations
             .Include(o => o.OwnerUser)
             .Include(o => o.Staff)
             .Where(o => !o.IsDeleted && (o.OwnerUserId == userId || o.Staff.Any(u => u.Id == userId)))
             .FirstOrDefaultAsync(ct);
     }
+
     public async Task<int> GetPrivateDocumentsCountByOrganizationAsync(Guid organizationId, CancellationToken ct = default)
     {
-        return await _context.Documents
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+        return await context.Documents
             .Where(d => !d.IsDeleted
                         && d.ClientOrganizationId == organizationId
                         && d.Privacy == DocumentPrivacy.Private)
@@ -28,11 +30,13 @@ public class ClientOrganizationRepository : Repository<ClientOrganization>
 
     public async Task<ClientOrganization?> GetByIdWithStaffAsync(Guid organizationId, CancellationToken ct = default)
     {
-        return await _dbSet
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+        return await context.ClientOrganizations
             .Include(o => o.OwnerUser)
             .Include(o => o.Staff)
             .FirstOrDefaultAsync(o => o.Id == organizationId && !o.IsDeleted, ct);
     }
+
     public async Task<(IReadOnlyList<ClientOrganization> Items, int TotalCount)> GetPublicOrganizationsAsync(
         string? searchTerm,
         string? sortField,
@@ -41,7 +45,9 @@ public class ClientOrganizationRepository : Repository<ClientOrganization>
         int pageSize,
         CancellationToken ct = default)
     {
-        var query = _dbSet
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+
+        var query = context.ClientOrganizations
             .Include(o => o.OwnerUser)
             .Include(o => o.Staff)
             .Where(o => !o.IsDeleted && o.Privacy == OrganizationPrivacy.Public && o.IsActive);
@@ -56,7 +62,6 @@ public class ClientOrganizationRepository : Repository<ClientOrganization>
 
         var totalCount = await query.CountAsync(ct);
 
-        // Сортировка
         IOrderedQueryable<ClientOrganization> orderedQuery = sortField switch
         {
             "Name" => sortAscending ? query.OrderBy(o => o.Name) : query.OrderByDescending(o => o.Name),
@@ -66,7 +71,7 @@ public class ClientOrganizationRepository : Repository<ClientOrganization>
             "CreatedAtUtc" => sortAscending
                 ? query.OrderBy(o => o.CreatedAtUtc)
                 : query.OrderByDescending(o => o.CreatedAtUtc),
-            _ => query.OrderBy(o => o.Name) // по умолчанию по названию
+            _ => query.OrderBy(o => o.Name)
         };
 
         var items = await orderedQuery
@@ -76,11 +81,11 @@ public class ClientOrganizationRepository : Repository<ClientOrganization>
 
         return (items, totalCount);
     }
-    // В ClientOrganizationRepository.cs
 
     public async Task<ClientOrganization?> GetOrganizationDetailsAsync(Guid orgId, CancellationToken ct = default)
     {
-        return await _dbSet
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+        return await context.ClientOrganizations
             .Include(o => o.OwnerUser)
             .Include(o => o.Staff)
             .FirstOrDefaultAsync(o => o.Id == orgId && !o.IsDeleted && o.Privacy == OrganizationPrivacy.Public && o.IsActive, ct);
@@ -88,7 +93,8 @@ public class ClientOrganizationRepository : Repository<ClientOrganization>
 
     public async Task<IReadOnlyList<Document>> GetPublicDocumentsByOrganizationAsync(Guid orgId, CancellationToken ct = default)
     {
-        return await _context.Documents
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+        return await context.Documents
             .Where(d => !d.IsDeleted && d.ClientOrganizationId == orgId && d.Privacy == DocumentPrivacy.Public)
             .Include(d => d.CreatedByUser)
             .OrderByDescending(d => d.UpdatedAtUtc ?? d.CreatedAtUtc)
@@ -97,7 +103,8 @@ public class ClientOrganizationRepository : Repository<ClientOrganization>
 
     public async Task<IReadOnlyList<ActiveChecklist>> GetActiveChecklistsByOrganizationAsync(Guid orgId, CancellationToken ct = default)
     {
-        return await _context.ActiveChecklists
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+        return await context.ActiveChecklists
             .Include(ac => ac.Checklist)
             .Include(ac => ac.Items.Where(i => !i.IsDeleted).OrderBy(i => i.Order))
             .Where(ac => !ac.IsDeleted && ac.ClientOrganizationId == orgId)

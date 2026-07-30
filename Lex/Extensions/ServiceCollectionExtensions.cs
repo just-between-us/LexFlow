@@ -11,7 +11,6 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddLexRepositories(this IServiceCollection services)
     {
         services.AddScoped<DocumentTemplateRepository>();
-        services.AddScoped<ChecklistRepository>();
         services.AddScoped<DocumentRepository>();
         services.AddScoped<DocumentVersionRepository>();
         services.AddScoped<ActiveChecklistRepository>();

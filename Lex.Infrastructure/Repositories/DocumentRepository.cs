@@ -4,19 +4,19 @@ using Lex.Domain.Enums;
 using Lex.Infrastructure.Data;
 
 namespace Lex.Infrastructure.Repositories;
-
 public class DocumentRepository : Repository<Document>
 {
-    public DocumentRepository(AppDbContext context) : base(context)
+    public DocumentRepository(IDbContextFactory<AppDbContext> contextFactory) : base(contextFactory)
     {
     }
 
-    /// Получить документ со всеми связанными данными
     public virtual async Task<Document?> GetDocumentWithDetailsAsync(
         Guid documentId,
         CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.Documents
             .Where(d => !d.IsDeleted && d.Id == documentId)
             .Include(d => d.CreatedByUser)
             .Include(d => d.Template)
@@ -40,14 +40,15 @@ public class DocumentRepository : Repository<Document>
         int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.IgnoreQueryFilters().AsNoTracking().AsQueryable();
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        var query = context.Documents.IgnoreQueryFilters().AsNoTracking().AsQueryable();
 
         query = lifecycleFilter switch
         {
             DocumentLifecycleFilter.ActiveOnly => query.Where(d => !d.IsDeleted && !d.ArchivedAtUtc.HasValue),
             DocumentLifecycleFilter.ArchivedOnly => query.Where(d => !d.IsDeleted && d.ArchivedAtUtc.HasValue),
             DocumentLifecycleFilter.DeletedOnly => query.Where(d => d.IsDeleted),
-            _ => query.Where(d => !d.IsDeleted) // NotDeleted
+            _ => query.Where(d => !d.IsDeleted)
         };
 
         if (userId.HasValue)
@@ -82,21 +83,22 @@ public class DocumentRepository : Repository<Document>
         return (items, totalCount);
     }
 
-    /// Получить документ по Id, включая удалённые (в обход глобального query filter)
     public async Task<Document?> GetByIdIncludingDeletedAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.Documents
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
     }
 
-    /// Удалить редактора документа
     public virtual async Task RemoveEditorFromDocumentAsync(
         Guid documentId,
         Guid editorId,
         CancellationToken cancellationToken = default)
     {
-        var document = await _dbSet
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var document = await context.Documents
             .Include(d => d.Editors)
             .FirstOrDefaultAsync(d => !d.IsDeleted && d.Id == documentId, cancellationToken);
 
@@ -108,7 +110,7 @@ public class DocumentRepository : Repository<Document>
         {
             document.Editors.Remove(editor);
             document.UpdatedAtUtc = DateTime.UtcNow;
-            await _context.SaveChangesAsync(cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
         }
     }
 }

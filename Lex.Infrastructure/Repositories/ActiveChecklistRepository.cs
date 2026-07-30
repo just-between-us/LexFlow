@@ -6,11 +6,13 @@ namespace Lex.Infrastructure.Repositories;
 
 public class ActiveChecklistRepository : Repository<ActiveChecklist>
 {
-    public ActiveChecklistRepository(AppDbContext context) : base(context) { }
+    public ActiveChecklistRepository(IDbContextFactory<AppDbContext> contextFactory) : base(contextFactory) { }
 
     public virtual async Task<IReadOnlyList<ActiveChecklist>> GetUserActiveChecklistsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.ActiveChecklists
             .Where(ac => !ac.IsDeleted && ac.UserId == userId)
             .Include(ac => ac.Checklist)
             .Include(ac => ac.Items.OrderBy(i => i.Order))
