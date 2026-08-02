@@ -1,0 +1,14 @@
+﻿@page "/documents"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudTabs Elevation="1" Rounded="true" PanelClass="pa-0 pt-4">
+        <MudTabPanel Text="Мои документы" Icon="@Icons.Material.Filled.Description">
+            <MyDocumentsSection />
+        </MudTabPanel>
+        <MudTabPanel Text="Каталог шаблонов" Icon="@Icons.Material.Filled.LibraryBooks">
+            <TemplatesSection />
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>

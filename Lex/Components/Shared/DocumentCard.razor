@@ -45,9 +45,6 @@
                             Удалён
                         </MudChip>
                     }
-                    <MudChip T="string" Size="Size.Small" Color="@DisplayHelper.GetStatusColor(Document.Status)" Variant="Variant.Text">
-                        @DisplayHelper.GetStatusDisplayName(Document.Status)
-                    </MudChip>
                     <MudChip T="string" Size="Size.Small" Color="@DisplayHelper.GetTypeColor(Document.Type)" Variant="Variant.Outlined">
                         @DisplayHelper.GetTypeDisplayName(Document.Type)
                     </MudChip>
@@ -57,6 +54,9 @@
                             @DisplayHelper.GetPrivacyDisplayName(Document.Privacy)
                         </MudChip>
                     }
+                    <MudChip T="string" Size="Size.Small" Color="@DisplayHelper.GetStatusColor(Document.Status)" Variant="Variant.Text">
+                        @DisplayHelper.GetStatusDisplayName(Document.Status)
+                    </MudChip>
                 </div>
 
                 <MudText Typo="Typo.body2" Class="text-muted mb-2 line-clamp-2">
@@ -100,8 +100,22 @@
                         </MudButton>
                     </MudTooltip>
                 }
+                else if (Document.Status == DocumentStatus.Ready)
+                {
+                    <MudTooltip Text="Открыть документ">
+                        <MudButton StartIcon="@Icons.Material.Filled.Visibility"
+                                   Color="Color.Default"
+                                   Variant="Variant.Text"
+                                   Size="Size.Small"
+                                   OnClick="@(() => OnOpen.InvokeAsync(Document.Id))"
+                                   FullWidth>
+                            Просмотр
+                        </MudButton>
+                    </MudTooltip>
+                }
                 else
                 {
+                    
                     <MudTooltip Text="Открыть документ">
                         <MudButton StartIcon="@Icons.Material.Filled.Visibility"
                                    Color="Color.Default"
