@@ -1,0 +1,14 @@
+﻿@page "/checklists"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudTabs Elevation="1" Rounded="true" PanelClass="pa-0 pt-4">
+        <MudTabPanel Text="Мои активные чек‑листы" Icon="@Icons.Material.Filled.Checklist">
+            <MyActiveChecklistsSection />
+        </MudTabPanel>
+        <MudTabPanel Text="Каталог чек‑листов" Icon="@Icons.Material.Filled.LibraryBooks">
+            <ChecklistTemplatesSection />
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>

@@ -1,0 +1,91 @@
+﻿@using lex.Application.DTOs
+@using Lex.Components.Utils
+
+<MudItem xs="12" sm="6" lg="4">
+    <MudCard Elevation="1" Class="counterparty-card h-100 d-flex flex-column">
+        <MudCardContent Class="flex-grow-1">
+            <div class="d-flex align-center gap-3 mb-3">
+                <MudAvatar Color="@GetAvatarColor()" Size="Size.Medium">
+                    @GetInitials()
+                </MudAvatar>
+                <div class="min-w-0 flex-grow-1">
+                    <MudTooltip Text="@Counterparty.FullName" Arrow="true" Placement="Placement.Top">
+                        <MudText Typo="Typo.h6" Class="mud-text-truncate">@Counterparty.FullName</MudText>
+                    </MudTooltip>
+                    <MudText Typo="Typo.caption" Class="text-muted">
+                        На платформе @DisplayHelper.GetRelativeTime(Counterparty.MemberSinceUtc)
+                    </MudText>
+                </div>
+            </div>
+
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Class="mb-2">
+                @DisplayHelper.GetActivityTypeDisplay(Counterparty.ActivityType)
+            </MudChip>
+
+            @if (!string.IsNullOrWhiteSpace(Counterparty.JobTitle))
+            {
+                <MudText Typo="Typo.body2" Class="d-flex align-center gap-1 mb-1">
+                    <MudIcon Icon="@Icons.Material.Filled.WorkOutline" Size="Size.Small" Class="text-muted" />
+                    @Counterparty.JobTitle
+                </MudText>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(Counterparty.OrganizationName))
+            {
+                <MudTooltip Text="@(Counterparty.IsVerifiedOrganization ? "Зарегистрированная организация на платформе" : "Указано пользователем вручную")">
+                    <MudText Typo="Typo.body2" Class="d-flex align-center gap-1 mb-1">
+                        <MudIcon Icon="@(Counterparty.IsVerifiedOrganization ? Icons.Material.Filled.Verified : Icons.Material.Filled.Apartment)"
+                                  Size="Size.Small" Class="@(Counterparty.IsVerifiedOrganization ? "" : "text-muted")"
+                                  Color="@(Counterparty.IsVerifiedOrganization ? Color.Info : Color.Default)" />
+                        @Counterparty.OrganizationName
+                    </MudText>
+                </MudTooltip>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(Counterparty.Region))
+            {
+                <MudText Typo="Typo.body2" Class="d-flex align-center gap-1 text-muted">
+                    <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" />
+                    @Counterparty.Region
+                </MudText>
+            }
+        </MudCardContent>
+
+        <MudCardActions Class="border-top pa-2">
+            <MudTooltip Text="Просмотр профиля появится позже">
+                <MudButton StartIcon="@Icons.Material.Filled.Person"
+                           Color="Color.Default"
+                           Variant="Variant.Text"
+                           Size="Size.Small"
+                           Disabled="true"
+                           FullWidth>
+                    Профиль (скоро)
+                </MudButton>
+            </MudTooltip>
+        </MudCardActions>
+    </MudCard>
+</MudItem>
+
+@code {
+    [Parameter, EditorRequired] public CounterpartySummaryDto Counterparty { get; set; } = null!;
+
+    private string GetInitials()
+    {
+        var parts = Counterparty.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var initials = string.Concat(parts.Take(2).Select(p => char.ToUpper(p[0])));
+        return string.IsNullOrEmpty(initials) ? "?" : initials;
+    }
+
+    private Color GetAvatarColor()
+    {
+        var hash = Math.Abs(Counterparty.Id.GetHashCode()) % 5;
+        return hash switch
+        {
+            0 => Color.Primary,
+            1 => Color.Secondary,
+            2 => Color.Info,
+            3 => Color.Success,
+            _ => Color.Tertiary
+        };
+    }
+}
