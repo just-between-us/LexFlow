@@ -1,6 +1,7 @@
 ﻿using lex.Application.DTOs;
 using lex.Application.Interfaces;
 using Lex.Domain.Entities;
+using Lex.Domain.Enums;
 using Lex.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +40,7 @@ public class UserProfileService : IUserProfileService
             Region = profile?.Region,
             BirthDate = profile?.BirthDate,
             Email = user.Email,
+            IsPublicProfile = user.Privacy == UserPrivacy.Public,
             MemberSinceUtc = user.CreatedAtUtc,
             IsActive = user.IsActive,
             OrganizationName = user.ClientOrganization?.Name
@@ -53,6 +55,7 @@ public class UserProfileService : IUserProfileService
         user.FirstName = model.FirstName;
         user.LastName = model.LastName;
         user.ActivityType = model.ActivityType;
+        user.Privacy = model.IsPublicProfile ? UserPrivacy.Public : UserPrivacy.Private;
         var result = await _userManager.UpdateAsync(user);
         if (!result.Succeeded)
             throw new InvalidOperationException(string.Join(", ", result.Errors.Select(e => e.Description)));

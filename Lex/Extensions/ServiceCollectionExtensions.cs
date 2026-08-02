@@ -16,6 +16,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ActiveChecklistRepository>();
         services.AddScoped<UserProfileRepository>();
         services.AddScoped<ClientOrganizationRepository>();
+        services.AddScoped<CounterpartyRepository>();
         return services;
     }
 
@@ -31,6 +32,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IOrganizationPublicService, OrganizationPublicService>();
         services.AddScoped<IDocumentEditingService, DocumentEditingService>();
+        services.AddScoped<ICounterpartySearchService, CounterpartySearchService>();
         return services;
     }
 

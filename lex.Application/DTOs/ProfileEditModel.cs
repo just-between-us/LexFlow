@@ -26,7 +26,7 @@ public class ProfileEditModel
 
     public DateTime? BirthDate { get; set; }
 
-    // Только для отображения в шапке — не редактируются в этой форме
+    public bool IsPublicProfile { get; set; } 
     public string? Email { get; init; }
     public DateTime MemberSinceUtc { get; init; }
     public bool IsActive { get; init; }

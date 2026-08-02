@@ -13,6 +13,7 @@ public class User : IdentityUser<Guid>
     public DateTime? UpdatedAtUtc { get; set; }
 
     public UserActivityType ActivityType { get; set; } = UserActivityType.Guest;
+    public UserPrivacy Privacy { get; set; } = UserPrivacy.Private; 
 
     // Связь с организацией (Один-ко-многим: в одной организации много пользователей)
     public Guid? ClientOrganizationId { get; set; }

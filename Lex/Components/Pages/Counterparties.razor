@@ -1,0 +1,312 @@
+﻿@page "/counterparties"
+@attribute [Authorize]
+@using lex.Application.DTOs
+@using lex.Application.Interfaces
+@using Lex.Domain.Enums
+@using Lex.Components.Auth
+@using Lex.Components.Shared
+@using Lex.Components.Utils
+@using Microsoft.AspNetCore.Authorization
+@inject ICounterpartySearchService SearchService
+@inject UserContext UserContext
+
+<div class="py-4">
+    <PageTitle>Поиск контрагентов</PageTitle>
+</div>
+
+<div class="d-flex align-center justify-space-between mb-2 flex-wrap gap-2">
+    <div>
+        <MudText Typo="Typo.h4">Поиск контрагентов</MudText>
+        <MudText Typo="Typo.body2" Class="text-muted">
+            Находите других пользователей платформы, открывших доступ к своему профилю
+        </MudText>
+    </div>
+</div>
+
+<MudPaper Class="pa-4 mb-3 mt-3 rounded-lg toolbar-panel" Elevation="0">
+    <MudStack Row="true" Spacing="2" Class="align-center flex-wrap">
+        <MudTextField @bind-Value="_searchQuery"
+                      Label="Поиск"
+                      Placeholder="Имя, должность, компания..."
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true"
+                      DebounceInterval="350"
+                      OnDebounceIntervalElapsed="OnSearchDebounced"
+                      OnKeyUp="OnSearchKeyUp"
+                      Clearable="true"
+                      OnClearButtonClick="@(() => OnSearchCleared())"
+                      Variant="Variant.Outlined"
+                      Class="flex-grow-1"
+                      Style="min-width: 220px;"/>
+
+        <MudSelect T="UserActivityType?"
+                   Label="Тип деятельности"
+                   Value="_filterActivityType"
+                   Variant="Variant.Outlined"
+                   Class="flex-shrink-0"
+                   Style="min-width: 200px;"
+                   ValueChanged="OnActivityTypeChanged">
+            <MudSelectItem Value="@((UserActivityType?)null)">Все</MudSelectItem>
+            @foreach (var t in Enum.GetValues<UserActivityType>())
+            {
+                <MudSelectItem Value="@((UserActivityType?)t)">
+                    @DisplayHelper.GetActivityTypeDisplay(t)
+                </MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudDivider Vertical="true" Class="mx-1 d-none d-md-flex" />
+
+        <MudTooltip Text="Порядок отображения">
+            <MudMenu Label="@GetSortLabel()"
+                     Icon="@Icons.Material.Filled.Sort"
+                     EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                     Variant="Variant.Text"
+                     Class="flex-shrink-0 rounded-button-hover-scale">
+                @foreach (var (field, label) in SortOptions)
+                {
+                    <MudMenuItem OnClick="@(() => SetSort(field))">
+                        <span class="d-flex align-center">
+                            @label
+                            @if (IsCurrentSort(field))
+                            {
+                                <MudIcon Icon="@GetDirectionIcon()" Size="Size.Small" Class="ml-2" />
+                            }
+                        </span>
+                    </MudMenuItem>
+                }
+            </MudMenu>
+        </MudTooltip>
+
+        <MudTooltip Text="@(_sortAscending ? "По возрастанию" : "По убыванию")">
+            <div Class="rounded-button-hover-scale">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward"
+                               OnClick="@ToggleSortDirection"
+                               Style="@ArrowRotationStyle"
+                               Variant="Variant.Text"/>
+            </div>
+        </MudTooltip>
+
+        <MudTooltip Text="Обновить">
+            <div Class="rounded-button-hover-scale">
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                               OnClick="@OnRefreshClick"
+                               Disabled="@_isRefreshing"
+                               Style="@RefreshSpinStyle"
+                               Variant="Variant.Text"/>
+            </div>
+        </MudTooltip>
+
+        <MudSpacer />
+
+        <MudChip T="string" Size="Size.Medium" Color="Color.Primary" Variant="Variant.Text">
+            @(_totalCount == 0 ? "Ничего не найдено" : $"Найдено: {_totalCount}")
+        </MudChip>
+    </MudStack>
+
+    @if (HasActiveFilters)
+    {
+        <MudStack Row="true" Spacing="1" Class="mt-3 flex-wrap align-center">
+            <MudText Typo="Typo.caption" Class="text-muted mr-1">Фильтры:</MudText>
+            @if (!string.IsNullOrWhiteSpace(_searchQuery))
+            {
+                <MudChip T="string" Size="Size.Small" OnClose="@(() => OnSearchCleared())">
+                    "@_searchQuery"
+                </MudChip>
+            }
+            @if (_filterActivityType.HasValue)
+            {
+                <MudChip T="string" Size="Size.Small" OnClose="@(() => ClearActivityFilter())">
+                    @DisplayHelper.GetActivityTypeDisplay(_filterActivityType.Value)
+                </MudChip>
+            }
+            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@ResetFilters">
+                Сбросить всё
+            </MudButton>
+        </MudStack>
+    }
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudGrid>
+        @for (int i = 0; i < _pageSize; i++)
+        {
+            <MudItem xs="12" sm="6" lg="4">
+                <MudPaper Class="pa-4 rounded-lg" Style="height: 200px;">
+                    <div class="d-flex gap-3 mb-3">
+                        <MudSkeleton SkeletonType="SkeletonType.Circle" Width="40px" Height="40px" />
+                        <div class="flex-grow-1">
+                            <MudSkeleton Width="70%" Height="24px" Class="mb-1" />
+                            <MudSkeleton Width="40%" Height="16px" />
+                        </div>
+                    </div>
+                    <MudSkeleton Width="50%" Height="20px" Class="mb-2" />
+                    <MudSkeleton Width="80%" Height="16px" />
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+}
+else if (!_results.Any())
+{
+    <MudPaper Class="pa-8 rounded-lg text-center" Elevation="0" Style="background: var(--mud-palette-background-grey);">
+        <MudIcon Icon="@Icons.Material.Filled.PersonSearch" Size="Size.Large" Class="mb-2 text-muted" />
+        <MudText Typo="Typo.h6" Class="mb-1">Контрагенты не найдены</MudText>
+        <MudText Typo="Typo.body2" Class="text-muted mb-3">
+            @(HasActiveFilters ? "Попробуйте изменить поиск или фильтры" : "Пока никто не открыл свой профиль для поиска")
+        </MudText>
+        @if (HasActiveFilters)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@ResetFilters">
+                Сбросить фильтры
+            </MudButton>
+        }
+    </MudPaper>
+}
+else
+{
+    <MudGrid>
+        @foreach (var user in _results)
+        {
+            <CounterpartyCard Counterparty="user" />
+        }
+    </MudGrid>
+
+    <div class="d-flex flex-column align-center mt-4 gap-2">
+        <MudPagination Selected="@_currentPage"
+                       Count="@_totalPages"
+                       SelectedChanged="@OnPaginationChanged"
+                       Size="Size.Medium"
+                       Color="Color.Primary" />
+        <MudText Typo="Typo.caption" Class="text-muted">
+            Показано @Math.Min((_currentPage - 1) * _pageSize + 1, _totalCount)–@Math.Min(_currentPage * _pageSize, _totalCount) из @_totalCount
+        </MudText>
+    </div>
+}
+
+@code {
+    private Guid? _currentUserId;
+    private List<CounterpartySummaryDto> _results = new();
+    private bool _isLoading = true;
+    private bool _isRefreshing;
+    private int _currentPage = 1;
+    private int _totalPages = 1;
+    private int _totalCount;
+    private readonly int _pageSize = 12;
+    private const int MinSpinMs = 600;
+
+    private string _searchQuery = string.Empty;
+    private UserActivityType? _filterActivityType;
+
+    private string _sortField = "name";
+    private bool _sortAscending = true;
+    private static readonly (string Field, string Label)[] SortOptions =
+    [
+        ("name", "По имени"),
+        ("recent", "По дате регистрации")
+    ];
+
+    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_searchQuery) || _filterActivityType.HasValue;
+
+    private string ArrowRotationStyle =>
+        $"transform: rotate({(_sortAscending ? 0 : 180)}deg); transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);";
+
+    private string RefreshSpinStyle =>
+        $"transform: rotate({(_isRefreshing ? 360 : 0)}deg); transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentUserId = Guid.TryParse(UserContext.CurrentUser?.UserId, out var uid) ? uid : null;
+        if (_currentUserId.HasValue)
+            await LoadData();
+        else
+            _isLoading = false;
+    }
+
+    private async Task LoadData()
+    {
+        if (_currentUserId is null) return;
+        _isLoading = true;
+        StateHasChanged();
+
+        var result = await SearchService.SearchAsync(
+            _currentUserId.Value, _searchQuery, _filterActivityType,
+            _sortField, _sortAscending, _currentPage, _pageSize);
+
+        _results = result.Items.ToList();
+        _totalCount = result.TotalCount;
+        _totalPages = Math.Max(1, (int)Math.Ceiling((double)_totalCount / _pageSize));
+
+        _isLoading = false;
+        _isRefreshing = false;
+        StateHasChanged();
+    }
+
+    private async Task OnSearchDebounced(string value) => await ResetAndReload();
+    private async Task OnSearchKeyUp(KeyboardEventArgs e) { if (e.Key == "Enter") await ResetAndReload(); }
+    private async Task OnSearchCleared() { _searchQuery = string.Empty; await ResetAndReload(); }
+
+    private async Task OnActivityTypeChanged(UserActivityType? value)
+    {
+        _filterActivityType = value;
+        await ResetAndReload();
+    }
+
+    private async Task ClearActivityFilter() { _filterActivityType = null; await ResetAndReload(); }
+
+    private async Task ResetFilters()
+    {
+        _searchQuery = string.Empty;
+        _filterActivityType = null;
+        await ResetAndReload();
+    }
+
+    private async Task ResetAndReload()
+    {
+        _currentPage = 1;
+        await LoadData();
+    }
+
+    private async Task OnPaginationChanged(int page)
+    {
+        _currentPage = page;
+        await LoadData();
+    }
+
+    private async Task OnRefreshClick()
+    {
+        if (_isRefreshing) return;
+        _isRefreshing = true;
+        StateHasChanged();
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        await LoadData();
+
+        var remaining = MinSpinMs - (int)sw.ElapsedMilliseconds;
+        if (remaining > 0) await Task.Delay(remaining);
+
+        _isRefreshing = false;
+        StateHasChanged();
+    }
+
+    private async Task SetSort(string field)
+    {
+        if (_sortField == field) _sortAscending = !_sortAscending;
+        else { _sortField = field; _sortAscending = true; }
+        _currentPage = 1;
+        await LoadData();
+    }
+
+    private async Task ToggleSortDirection()
+    {
+        _sortAscending = !_sortAscending;
+        _currentPage = 1;
+        await LoadData();
+    }
+
+    private bool IsCurrentSort(string field) => _sortField == field;
+    private string GetDirectionIcon() => _sortAscending ? Icons.Material.Filled.ArrowUpward : Icons.Material.Filled.ArrowDownward;
+    private string GetSortLabel() => SortOptions.FirstOrDefault(x => x.Field == _sortField).Label ?? "Сортировка";
+}
